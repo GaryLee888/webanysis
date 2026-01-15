@@ -15,6 +15,33 @@ warnings.filterwarnings("ignore")
 # 頁面設定
 st.set_page_config(page_title="台股決策分析系統", layout="wide")
 
+# --- 自定義 CSS：讓編號與輸入框緊接著排列 ---
+st.markdown("""
+    <style>
+    /* 隱藏標籤並讓輸入框更緊湊 */
+    div[data-testid="stSidebar"] div[data-testid="column"] {
+        display: flex;
+        align-items: center;
+        margin-bottom: -15px;
+    }
+    div[data-testid="stSidebar"] .stTextInput label {
+        display: none;
+    }
+    div[data-testid="stSidebar"] .stTextInput div {
+        margin-top: 0px !important;
+    }
+    /* 設定編號文字樣式 */
+    .row-label {
+        color: #fcf3cf;
+        font-family: "Verdana";
+        font-size: 0.9rem;
+        margin-right: 10px;
+        min-width: 25px;
+        text-align: right;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # --- 1. 字體設定 (解決圖表方塊字) ---
 def set_mpl_chinese():
     font_file = 'msjh.ttc' 
@@ -97,16 +124,19 @@ class StockEngine:
 st.title("🚀 台股決策分析系統")
 
 with st.sidebar:
-    st.header("🔍 代碼/名稱")
-    # 預設值與 Tkinter 版本保持一致
+    st.markdown("<p style='color:#fcf3cf; font-weight:bold; font-size:1.1rem;'>代碼/名稱</p>", unsafe_allow_html=True)
     default_vals = ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
     queries = []
     
-    # 恢復為 10 行垂直排列
+    # 使用 columns 來配置「數字」與「輸入框」緊接在同一行
     for i in range(10):
-        val = st.text_input(f"{i+1}:", value=default_vals[i], key=f"in_{i}")
-        if val.strip():
-            queries.append(val.strip())
+        c1, c2 = st.columns([1, 4])
+        with c1:
+            st.markdown(f'<p class="row-label">{i+1}:</p>', unsafe_allow_html=True)
+        with c2:
+            val = st.text_input("", value=default_vals[i], key=f"in_{i}")
+            if val.strip():
+                queries.append(val.strip())
             
     st.markdown("<br>", unsafe_allow_html=True)
     analyze_btn = st.button("啟動分析", type="primary", use_container_width=True)
@@ -134,13 +164,10 @@ if analyze_btn and queries:
             chip_data = engine.fetch_chips(sid)
             curr, prev = df.iloc[-1], df.iloc[-2]
             
-            # 價格校準 0.05
-            entry_raw = (curr['MA20'] + curr['BB_up']) / 2 if curr['Close'] <= curr['BB_up'] else curr['Close'] * 0.98
-            entry_p = round_stock_price(entry_raw)
+            entry_p = round_stock_price((curr['MA20'] + curr['BB_up']) / 2 if curr['Close'] <= curr['BB_up'] else curr['Close'] * 0.98)
             sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
             tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
 
-            # 25 項指標清單
             indicator_list = [
                 ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
                 ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
@@ -170,37 +197,21 @@ if analyze_btn and queries:
             ]
             score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
 
-            # --- A. 得分與評論 (換行顯示) ---
             rating = "🚀 強勢標的" if score >= 70 else "⚖️ 穩健標的" if score >= 50 else "⚠️ 觀望標的"
             comment = "多空共鳴，適合順勢操作。" if score >= 70 else "格局穩定，建議分批佈局。" if score >= 50 else "訊號疲弱，建議保守觀望。"
             
             st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating}")
             st.write(f"💬 分析評論：{comment}")
 
-            # --- B. 價格數據卡片 ---
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("現價", f"{float(curr['Close']):.2f}")
             c2.metric("建議買點", f"{entry_p:.2f}")
             
-            # 止損位用綠色 (自定義 HTML)
             with c3:
-                st.markdown(f"""
-                <div style="display: flex; flex-direction: column;">
-                    <span style="color: gray; font-size: 0.8rem;">止損位</span>
-                    <span style="color: green; font-size: 1.5rem; font-weight: bold;">{sl_p:.2f}</span>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # 獲利目標用紅色 (自定義 HTML)
+                st.markdown(f'<div style="display: flex; flex-direction: column;"><span style="color: gray; font-size: 0.8rem;">止損位</span><span style="color: green; font-size: 1.5rem; font-weight: bold;">{sl_p:.2f}</span></div>', unsafe_allow_html=True)
             with c4:
-                st.markdown(f"""
-                <div style="display: flex; flex-direction: column;">
-                    <span style="color: gray; font-size: 0.8rem;">獲利目標</span>
-                    <span style="color: red; font-size: 1.5rem; font-weight: bold;">{tp_p:.2f}</span>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div style="display: flex; flex-direction: column;"><span style="color: gray; font-size: 0.8rem;">獲利目標</span><span style="color: red; font-size: 1.5rem; font-weight: bold;">{tp_p:.2f}</span></div>', unsafe_allow_html=True)
 
-            # --- C. K線圖 ---
             fig, ax = plt.subplots(figsize=(10, 4.5))
             df_p = df.tail(65)
             ax.plot(df_p.index, df_p['BB_up'], color='#e74c3c', ls='--', alpha=0.3)
@@ -212,15 +223,11 @@ if analyze_btn and queries:
             ax.set_title(f"{stock_name} ({sid}) 分析圖")
             st.pyplot(fig)
 
-            # --- D. 25 項指標 (顏色對調版) ---
             st.markdown("### 詳細指標診斷")
             ind_c1, ind_c2 = st.columns(2)
             for idx, it in enumerate(indicator_list):
                 col = ind_c1 if idx < 13 else ind_c2
-                
-                # 顏色邏輯對調：正向用紅色 (台股習慣)，負向用綠色
                 icon = "🔴" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🟢"
                 status = it[2] if it[1] == 1.0 else (it[3] if it[1] == 0.5 else it[-1])
                 color = "red" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "green"
-                
                 col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{status}</span>", unsafe_allow_html=True)
