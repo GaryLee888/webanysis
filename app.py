@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 # 頁面設定
 st.set_page_config(page_title="台股決策分析系統", layout="wide")
 
-# --- CSS 修飾：極致緊湊且齊平排版 ---
+# --- CSS 修飾：強制按鈕與輸入框齊平對齊 ---
 st.markdown("""
     <style>
     /* 側邊欄背景與文字顏色 */
@@ -29,48 +29,59 @@ st.markdown("""
         display: none;
     }
     
-    /* 統一按鈕與輸入框的容器寬度與置中 */
+    /* 統一按鈕與輸入框的容器寬度與對齊位置 */
+    /* 這裡使用 flex-start 並配合 margin-left 確保兩者在同一條垂直線上 */
     [data-testid="stSidebar"] .stTextInput, [data-testid="stSidebar"] .stButton {
         width: 150px !important;
-        margin: 0 auto !important;
+        margin-left: 45px !important; /* 這裡的數值可根據你的螢幕手動微調，確保與輸入框齊平 */
+        margin-right: auto !important;
         padding: 0 !important;
     }
 
-    /* 調整輸入框樣式：高度與邊距 */
+    /* 調整輸入框樣式 */
     [data-testid="stSidebar"] input {
         height: 35px !important;
         width: 150px !important;
         font-size: 0.9rem !important;
         text-align: center !important;
         border-radius: 2px !important;
-        margin-bottom: 4px !important; /* 極小化間距 */
+        margin-bottom: 4px !important;
     }
 
-    /* 啟動分析按鈕：與輸入框完全齊平、大小一致 */
+    /* 啟動分析按鈕：取消置中，對齊左邊 */
     [data-testid="stSidebar"] button {
         background-color: #e67e22 !important;
         color: white !important;
         font-weight: bold !important;
         width: 150px !important;
         height: 35px !important;
-        margin: 0 auto !important;
         display: block !important;
         border-radius: 2px !important;
         border: none !important;
         line-height: 35px !important;
         padding: 0 !important;
         margin-top: 0px !important;
-        margin-bottom: 8px !important; /* 按鈕與下方第一個框的間距 */
+        margin-bottom: 8px !important;
+        text-align: center !important;
     }
     
-    /* 修正 Streamlit 內建容器的間距 */
+    /* 縮小垂直間距 */
     [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-        gap: 4px !important; /* 縮小所有元件間的距離 */
+        gap: 4px !important;
+    }
+    
+    /* 標題置中調整 */
+    .sidebar-title {
+        color: #fcf3cf;
+        text-align: center;
+        width: 150px;
+        margin-left: 45px;
+        margin-bottom: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 1. 字體設定 ---
+# --- 1. 字體設定 (解決圖表方塊字) ---
 def set_mpl_chinese():
     font_file = 'msjh.ttc' 
     if os.path.exists(font_file):
@@ -147,11 +158,11 @@ class StockEngine:
             }
         except: return None
 
-# --- 4. UI 介面 ---
+# --- UI 介面 ---
 st.title("🚀 台股決策分析系統")
 
 with st.sidebar:
-    st.markdown("<h3 style='color:#fcf3cf; text-align:center; margin-bottom:10px;'>代碼/名稱</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 class='sidebar-title'>代碼/名稱</h3>", unsafe_allow_html=True)
     
     # 啟動分析鈕置頂且齊平
     analyze_btn = st.button("啟動分析")
@@ -210,12 +221,13 @@ if analyze_btn and queries:
                 ("多空量比", (1.0 if curr['Vol_Ratio'] > 1 else 0.0), "買盤強", "賣壓大"),
                 ("價格變動", (1.0 if curr['ROC'] > 0 else 0.0), "正向", "負向"),
                 ("歷史位階", (1.0 if curr['SR_Rank'] > 0.5 else 0.0), "健康", "低迷"),
+                ("均線支撐", (1.0 if curr['Close'] > curr['MA10'] else 0.0), "強勁", "跌破"),
                 ("[籌] 投信連買", (1.0 if chip_data and chip_data['it'] else 0.0), "佈局中", "無動作"),
                 ("[籌] 外資波段", (1.0 if chip_data and chip_data['fg'] else 0.0), "加碼中", "調節中"),
                 ("[籌] 法人集結", (1.0 if chip_data and chip_data['inst'] else 0.0), "共識買", "分散"),
                 ("[籌] 攻擊量能", (1.0 if curr['Volume'] > curr['VMA20'] * 1.3 else 0.0), "爆量", "量縮"),
-                ("[籌] 資金匯集", (1.0 if curr['OBV'] > df['OBV'].tail(5).mean() else 0.0), "匯入", "流出"),
-                ("均線支撐", (1.0 if curr['Close'] > curr['MA10'] else 0.0), "強勁", "跌破")
+                ("[籌] 資金匯集", (1.0 if curr['OBV'] > df['OBV'].tail(5).mean() else 0.0), "匯入", "流出")
+                
             ]
             score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
 
