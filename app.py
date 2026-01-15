@@ -97,17 +97,18 @@ class StockEngine:
 st.title("🚀 台股決策分析系統")
 
 with st.sidebar:
-    st.header("🔍 股票清單")
-    default_vals = ["2330", "2317", "2454", "6223", "2603"]
+    st.header("🔍 代碼/名稱")
+    # 預設值與 Tkinter 版本保持一致
+    default_vals = ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
     queries = []
     
-    # 輸入框排列：不換行，每個 8 字元寬度
-    cols = st.columns(5)
-    for i in range(5):
-        with cols[i]:
-            val = st.text_input(f"{i+1}:", value=default_vals[i], key=f"in_{i}")
-            if val.strip(): queries.append(val.strip())
+    # 恢復為 10 行垂直排列
+    for i in range(10):
+        val = st.text_input(f"{i+1}:", value=default_vals[i], key=f"in_{i}")
+        if val.strip():
+            queries.append(val.strip())
             
+    st.markdown("<br>", unsafe_allow_html=True)
     analyze_btn = st.button("啟動分析", type="primary", use_container_width=True)
 
 engine = StockEngine()
@@ -133,13 +134,13 @@ if analyze_btn and queries:
             chip_data = engine.fetch_chips(sid)
             curr, prev = df.iloc[-1], df.iloc[-2]
             
-            # 價格對齊 0.05
+            # 價格校準 0.05
             entry_raw = (curr['MA20'] + curr['BB_up']) / 2 if curr['Close'] <= curr['BB_up'] else curr['Close'] * 0.98
             entry_p = round_stock_price(entry_raw)
             sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
             tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
 
-            # 指標清單
+            # 25 項指標清單
             indicator_list = [
                 ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
                 ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
@@ -181,7 +182,7 @@ if analyze_btn and queries:
             c1.metric("現價", f"{float(curr['Close']):.2f}")
             c2.metric("建議買點", f"{entry_p:.2f}")
             
-            # 止損位用綠色
+            # 止損位用綠色 (自定義 HTML)
             with c3:
                 st.markdown(f"""
                 <div style="display: flex; flex-direction: column;">
@@ -190,7 +191,7 @@ if analyze_btn and queries:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # 獲利目標用紅色
+            # 獲利目標用紅色 (自定義 HTML)
             with c4:
                 st.markdown(f"""
                 <div style="display: flex; flex-direction: column;">
