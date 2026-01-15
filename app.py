@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 # 頁面設定
 st.set_page_config(page_title="台股決策分析系統", layout="wide")
 
-# --- CSS 修飾：移除編號、縮小輸入框寬度、標題置中 ---
+# --- CSS 修飾：精確對齊按鈕大小與輸入框間距 ---
 st.markdown("""
     <style>
     /* 側邊欄背景與文字顏色 */
@@ -24,35 +24,39 @@ st.markdown("""
         color: #fcf3cf;
     }
     
-    /* 隱藏標籤 */
+    /* 隱藏預設標籤 */
     [data-testid="stSidebar"] .stTextInput label {
         display: none;
     }
     
-    /* 讓輸入框容器置中並縮小寬度 (50%) */
+    /* 調整輸入框容器：寬度 50% 並置中 */
     [data-testid="stSidebar"] .stTextInput {
         width: 50% !important;
         margin: 0 auto !important;
-        margin-bottom: -15px !important;
+        /* 設定下方外距為一個輸入框的高度 (約 35px) */
+        margin-bottom: 35px !important;
     }
 
     /* 調整輸入框內文字與高度 */
     [data-testid="stSidebar"] input {
-        height: 30px !important;
+        height: 35px !important;
         font-size: 0.9rem !important;
-        text-align: center !important; /* 輸入內容也置中 */
+        text-align: center !important;
         border-radius: 2px !important;
     }
 
-    /* 啟動分析按鈕樣式 */
+    /* 啟動分析按鈕：強制與輸入框一樣寬高 */
     [data-testid="stSidebar"] button {
         background-color: #e67e22 !important;
         color: white !important;
-        margin-top: 25px !important;
-        width: 80% !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
+        font-weight: bold !important;
+        width: 50% !important;
+        height: 35px !important;
+        margin: 0 auto !important;
         display: block !important;
+        border-radius: 2px !important;
+        border: none !important;
+        padding: 0 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -139,13 +143,11 @@ class StockEngine:
 st.title("🚀 台股決策分析系統")
 
 with st.sidebar:
-    # 標題置中
     st.markdown("<h3 style='color:#fcf3cf; text-align:center;'>代碼/名稱</h3>", unsafe_allow_html=True)
     
     default_vals = ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
     queries = []
     
-    # 移除編號，純輸入框顯示
     for i in range(10):
         val = st.text_input("", value=default_vals[i], key=f"in_{i}")
         if val.strip():
@@ -180,8 +182,69 @@ if analyze_btn and queries:
             sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
             tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
 
-            st.markdown(f"### 📊 綜合診斷")
-            # 後續邏輯保持不變...
-            st.info(f"當前標的: {stock_name} ({sid})")
+            # 得分與評分
+            indicator_list = [
+                ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
+                ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
+                ("KD動能", (1.0 if curr['K'] > curr['D'] else 0.0), "向上", "向下"),
+                ("MACD趨勢", (1.0 if curr['MACD_hist'] > 0 else 0.0), "紅柱", "綠柱"),
+                ("RSI強弱", (1.0 if curr['RSI'] > 50 else 0.0), "強勢", "弱勢"),
+                ("均線排列", (1.0 if curr['MA5'] > curr['MA10'] else 0.0), "多頭", "糾結"),
+                ("威廉指標", (1.0 if curr['K'] > 50 else 0.0), "看多", "看空"),
+                ("乖離率", (1.0 if abs(curr['BIAS20']) < 10 else 0.0), "安全", "過熱"),
+                ("波幅擠壓", (1.0 if curr['BB_width'] < 0.1 else 0.0), "蓄勢", "發散"),
+                ("量價配合", (1.0 if curr['Close'] >= prev['Close'] else 0.0), "穩健", "背離"),
+                ("能量潮", (1.0 if curr['OBV'] > df['OBV'].mean() else 0.0), "集中", "渙散"),
+                ("資金流向", (1.0 if curr['MFI'] > 50 else 0.0), "流入", "流出"),
+                ("成交均量", (1.0 if curr['Volume'] > curr['VMA20'] else 0.0), "量增", "量縮"),
+                ("多空勁道", (1.0 if curr['Close'] > curr['MA5'] else 0.0), "強勁", "偏弱"),
+                ("乖離動能", (1.0 if curr['BIAS5'] > curr['BIAS20'] else 0.0), "轉強", "趨緩"),
+                ("支撐位階", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "站穩", "破線"),
+                ("多空量比", (1.0 if curr['Vol_Ratio'] > 1 else 0.0), "買盤強", "賣壓大"),
+                ("價格變動", (1.0 if curr['ROC'] > 0 else 0.0), "正向", "負向"),
+                ("歷史位階", (1.0 if curr['SR_Rank'] > 0.5 else 0.0), "健康", "低迷"),
+                ("[籌] 投信連買", (1.0 if chip_data and chip_data['it'] else 0.0), "佈局中", "無動作"),
+                ("[籌] 外資波段", (1.0 if chip_data and chip_data['fg'] else 0.0), "加碼中", "調節中"),
+                ("[籌] 法人集結", (1.0 if chip_data and chip_data['inst'] else 0.0), "共識買", "分散"),
+                ("[籌] 攻擊量能", (1.0 if curr['Volume'] > curr['VMA20'] * 1.3 else 0.0), "爆量", "量縮"),
+                ("[籌] 資金匯集", (1.0 if curr['OBV'] > df['OBV'].tail(5).mean() else 0.0), "匯入", "流出"),
+                ("均線支撐", (1.0 if curr['Close'] > curr['MA10'] else 0.0), "強勁", "跌破")
+            ]
+            score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
+
+            rating = "🚀 強勢標的" if score >= 70 else "⚖️ 穩健標的" if score >= 50 else "⚠️ 觀望標的"
+            comment = "多空共鳴，適合順勢操作。" if score >= 70 else "格局穩定，建議分批佈局。" if score >= 50 else "訊號疲弱，建議保守觀望。"
             
-            # (下略詳細診斷與圖表程式碼，與前版一致)
+            st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating}")
+            st.write(f"💬 分析評論：{comment}")
+
+            # 價格顯示
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("現價", f"{float(curr['Close']):.2f}")
+            c2.metric("建議買點", f"{entry_p:.2f}")
+            with c3:
+                st.markdown(f'<div style="display:flex;flex-direction:column;"><span style="color:gray;font-size:0.8rem;">止損位</span><span style="color:green;font-size:1.5rem;font-weight:bold;">{sl_p:.2f}</span></div>', unsafe_allow_html=True)
+            with c4:
+                st.markdown(f'<div style="display:flex;flex-direction:column;"><span style="color:gray;font-size:0.8rem;">獲利目標</span><span style="color:red;font-size:1.5rem;font-weight:bold;">{tp_p:.2f}</span></div>', unsafe_allow_html=True)
+
+            # 圖表
+            fig, ax = plt.subplots(figsize=(10, 4.5))
+            df_p = df.tail(65)
+            ax.plot(df_p.index, df_p['BB_up'], color='#e74c3c', ls='--', alpha=0.3)
+            ax.plot(df_p.index, df_p['BB_low'], color='#27ae60', ls='--', alpha=0.3)
+            ax.plot(df_p.index, df_p['Close'], color='#2c3e50', lw=2)
+            ax.axhline(entry_p, color='#2980b9', ls='-', label='Entry')
+            ax.axhline(sl_p, color='green', ls='--', label='SL')
+            ax.axhline(tp_p, color='red', ls='--', label='TP')
+            ax.set_title(f"{stock_name} ({sid}) 分析圖")
+            st.pyplot(fig)
+
+            # 25 項指標 (顏色對調)
+            st.markdown("### 詳細指標診斷")
+            ind_c1, ind_c2 = st.columns(2)
+            for idx, it in enumerate(indicator_list):
+                col = ind_c1 if idx < 13 else ind_c2
+                icon = "🔴" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🟢"
+                status = it[2] if it[1] == 1.0 else (it[3] if it[1] == 0.5 else it[-1])
+                color = "red" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "green"
+                col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{status}</span>", unsafe_allow_html=True)
