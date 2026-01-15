@@ -30,7 +30,6 @@ set_mpl_chinese()
 
 # --- 2. 輔助工具：價格對齊 0.05 ---
 def round_stock_price(price):
-    # 台股常見跳動單位簡化處理：四捨五入至 0.05 
     return np.round(price * 20) / 20
 
 # --- 3. 核心引擎 ---
@@ -95,22 +94,17 @@ class StockEngine:
         except: return None
 
 # --- 4. UI 介面 ---
-st.title("🚀 台股全方位決策系統")
+st.title("🚀 台股決策分析系統")
 
 with st.sidebar:
-    st.header("🔍 股票清單")
-    default_vals = ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
+    st.header("🔍 股票清單 (上限5個)")
+    default_vals = ["2330", "2317", "2454", "6223", "2603"]
     queries = []
     
-    # 輸入框併排調整：每列兩個框，寬度縮小
-    for i in range(0, 10, 2):
-        sc1, sc2 = st.columns(2)
-        with sc1:
-            v1 = st.text_input(f"{i+1}:", value=default_vals[i], key=f"in_{i}")
-            if v1: queries.append(v1)
-        with sc2:
-            v2 = st.text_input(f"{i+2}:", value=default_vals[i+1], key=f"in_{i+1}")
-            if v2: queries.append(v2)
+    # 輸入框縮小至 5 個，單一垂直排列
+    for i in range(5):
+        val = st.text_input(f"{i+1}:", value=default_vals[i], key=f"in_{i}")
+        if val.strip(): queries.append(val.strip())
             
     analyze_btn = st.button("啟動分析", type="primary", use_container_width=True)
 
@@ -137,13 +131,13 @@ if analyze_btn and queries:
             chip_data = engine.fetch_chips(sid)
             curr, prev = df.iloc[-1], df.iloc[-2]
             
-            # 價格校準 0.05
+            # 價格對齊 0.05
             entry_raw = (curr['MA20'] + curr['BB_up']) / 2 if curr['Close'] <= curr['BB_up'] else curr['Close'] * 0.98
             entry_p = round_stock_price(entry_raw)
             sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
             tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
 
-            # --- 計算指標清單 (為了先算出總分) ---
+            # 指標計算
             indicator_list = [
                 ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
                 ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
@@ -173,11 +167,11 @@ if analyze_btn and queries:
             ]
             score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
 
-            # --- A. [新版面] 得分結果移到上方 ---
-            st.subheader(f"📊 綜合診斷：{score} 分")
-            if score >= 70: st.success("🚀 強勢標的")
-            elif score >= 50: st.warning("⚖️ 穩健標的")
-            else: st.error("⚠️ 觀望標的")
+            # --- A. 得分與評論直接接著顯示 ---
+            rating = "🚀 強勢標的" if score >= 70 else "⚖️ 穩健標的" if score >= 50 else "⚠️ 觀望標的"
+            comment = "多空共鳴，適合順勢操作。" if score >= 70 else "格局穩定，建議分批佈局。" if score >= 50 else "訊號疲弱，建議保守觀望。"
+            
+            st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating} | {comment}")
 
             # --- B. 價格數據卡片 ---
             c1, c2, c3, c4 = st.columns(4)
@@ -198,7 +192,7 @@ if analyze_btn and queries:
             ax.set_title(f"{stock_name} ({sid}) 分析圖")
             st.pyplot(fig)
 
-            # --- D. 25 項指標 (維持在原位) ---
+            # --- D. 25 項指標 (位置不變) ---
             st.markdown("### 詳細指標診斷")
             ind_c1, ind_c2 = st.columns(2)
             for idx, it in enumerate(indicator_list):
