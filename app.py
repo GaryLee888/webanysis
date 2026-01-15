@@ -15,81 +15,111 @@ warnings.filterwarnings("ignore")
 # 頁面設定
 st.set_page_config(page_title="台股決策分析系統", layout="wide")
 
-# --- CSS 修飾：強制按鈕與輸入框齊平對齊 ---
+# --- 專業科技感與高對比優化 CSS ---
 st.markdown("""
     <style>
-    /* 側邊欄背景與文字顏色 */
+    /* 全局科技背景：深藍黑與微發光網格 */
+    .stApp {
+        background-color: #0f172a;
+        background-image: 
+            linear-gradient(rgba(0, 212, 255, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 212, 255, 0.05) 1px, transparent 1px);
+        background-size: 30px 30px;
+    }
+
+    /* 側邊欄樣式：深色科技風格 */
     [data-testid="stSidebar"] {
-        background-color: #1c2833;
-        color: #fcf3cf;
+        background-color: #1c2833 !important;
+        border-right: 2px solid #00d4ff;
     }
     
-    /* 隱藏預設標籤 (Labels) */
+    /* 隱藏預設標籤並設定文字顏色 */
     [data-testid="stSidebar"] .stTextInput label {
         display: none;
     }
     
-    /* 統一按鈕與輸入框的容器寬度與對齊位置 */
-    /* 這裡使用 flex-start 並配合 margin-left 確保兩者在同一條垂直線上 */
+    [data-testid="stSidebar"] .sidebar-title {
+        color: #00d4ff;
+        text-align: center;
+        text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        margin-bottom: 10px;
+    }
+
+    /* 統一按鈕與輸入框的對齊 */
     [data-testid="stSidebar"] .stTextInput, [data-testid="stSidebar"] .stButton {
-        width: 120px !important;
-        margin-left: 45px !important; /* 這裡的數值可根據你的螢幕手動微調，確保與輸入框齊平 */
+        width: 140px !important;
+        margin-left: auto !important;
         margin-right: auto !important;
         padding: 0 !important;
     }
 
-    /* 調整輸入框樣式 */
+    /* 輸入框樣式 */
     [data-testid="stSidebar"] input {
-        height: 35px !important;
-        width: 120px !important;
-        font-size: 1.3rem !important;
+        height: 38px !important;
+        background-color: #2d3436 !important;
+        color: #ffffff !important;
+        border: 1px solid #00d4ff !important;
         text-align: center !important;
-        border-radius: 2px !important;
-        margin-bottom: 4px !important;
+        font-size: 1.1rem !important;
     }
 
-    /* 啟動分析按鈕：取消置中，對齊左邊 */
+    /* 啟動分析按鈕樣式 */
     [data-testid="stSidebar"] button {
         background-color: #e67e22 !important;
         color: white !important;
         font-weight: bold !important;
-        width: 120px !important;
-        height: 35px !important;
-        display: block !important;
-        border-radius: 2px !important;
+        width: 140px !important;
+        height: 40px !important;
+        border-radius: 4px !important;
         border: none !important;
-        line-height: 35px !important;
-        padding: 0 !important;
-        margin-top: 0px !important;
-        margin-bottom: 8px !important;
-        text-align: center !important;
+        box-shadow: 0 0 10px rgba(230, 126, 34, 0.3) !important;
     }
-    
-    /* 縮小垂直間距 */
-    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-        gap: 10px !important;
-    }
-    
-    /* 標題置中調整 */
-    .sidebar-title {
-        color: #fcf3cf;
+
+    /* 數據展示卡片樣式：毛玻璃效果 */
+    .metric-container {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid rgba(0, 212, 255, 0.2);
+        backdrop-filter: blur(10px);
         text-align: center;
-        width: 150px;
-        margin-left: 45px;
-        margin-bottom: 10px;
+    }
+    .metric-label {
+        color: #cbd5e1 !important; /* 提升灰色亮度確保可見 */
+        font-size: 1rem;
+        margin-bottom: 5px;
+    }
+    .metric-value {
+        font-family: 'Verdana', sans-serif;
+        font-size: 2.2rem; /* 統一字體大小 */
+        font-weight: bold;
+    }
+
+    /* 詳細指標清單背景 */
+    .indicator-row {
+        background: rgba(255, 255, 255, 0.02);
+        padding: 8px 15px;
+        border-radius: 5px;
+        margin-bottom: 4px;
+        border-left: 3px solid rgba(0, 212, 255, 0.3);
+    }
+    
+    h1, h2, h3, p, span {
+        color: #f1f5f9 !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 1. 字體設定 (解決圖表方塊字) ---
 def set_mpl_chinese():
-    font_file = 'msjh.ttc' 
-    if os.path.exists(font_file):
-        fe = fm.FontEntry(fname=font_file, name='CustomFont')
-        fm.fontManager.ttflist.insert(0, fe)
-        plt.rcParams['font.sans-serif'] = ['CustomFont']
-    else:
-        plt.rcParams['font.sans-serif'] = ['Noto Sans CJK JP', 'sans-serif']
+    # 這裡將技術分析圖設為亮色背景
+    plt.style.use('default') 
+    font_names = ['Microsoft JhengHei', 'SimHei', 'Arial Unicode MS', 'sans-serif']
+    for f in font_names:
+        try:
+            plt.rcParams['font.sans-serif'] = [f]
+            break
+        except: continue
     plt.rcParams['axes.unicode_minus'] = False 
 
 set_mpl_chinese()
@@ -159,25 +189,21 @@ class StockEngine:
         except: return None
 
 # --- UI 介面 ---
-st.title("🚀 台股決策分析系統")
+st.markdown("<h1 style='text-align: center; color: #00d4ff; text-shadow: 0 0 15px rgba(0, 212, 255, 0.5);'>🛡️ 台股決策分析系統</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("<h3 class='sidebar-title'>代碼/名稱</h3>", unsafe_allow_html=True)
-    
-    # 啟動分析鈕置頂且齊平
     analyze_btn = st.button("啟動分析")
-    
     default_vals = ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
     queries = []
     for i in range(10):
         val = st.text_input("", value=default_vals[i], key=f"in_{i}")
-        if val.strip():
-            queries.append(val.strip())
+        if val.strip(): queries.append(val.strip())
 
 engine = StockEngine()
 
 if analyze_btn and queries:
-    tabs = st.tabs([f" {q} " for q in queries])
+    tabs = st.tabs([f"● {q}" for q in queries])
     for i, query in enumerate(queries):
         with tabs[i]:
             sid = engine.special_mapping.get(query, query)
@@ -185,22 +211,21 @@ if analyze_btn and queries:
             if not sid.isdigit():
                 for code, info in twstock.codes.items():
                     if query in info.name: sid = code; stock_name = info.name; break
-            elif sid in twstock.codes:
-                stock_name = twstock.codes[sid].name
+            elif sid in twstock.codes: stock_name = twstock.codes[sid].name
 
             df_raw, ticker = engine.fetch_data(sid)
             if df_raw is None: 
-                st.error(f"查無數據: {sid}")
+                st.error(f"數據鏈結失敗: {sid}")
                 continue
 
             df = engine.calculate_indicators(df_raw)
             chip_data = engine.fetch_chips(sid)
             curr = df.iloc[-1]
-            
             entry_p = round_stock_price((curr['MA20'] + curr['BB_up']) / 2 if curr['Close'] <= curr['BB_up'] else curr['Close'] * 0.98)
             sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
             tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
 
+            # --- A. 得分與評論 ---
             indicator_list = [
                 ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
                 ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
@@ -221,47 +246,65 @@ if analyze_btn and queries:
                 ("多空量比", (1.0 if curr['Vol_Ratio'] > 1 else 0.0), "買盤強", "賣壓大"),
                 ("價格變動", (1.0 if curr['ROC'] > 0 else 0.0), "正向", "負向"),
                 ("歷史位階", (1.0 if curr['SR_Rank'] > 0.5 else 0.0), "健康", "低迷"),
+                ("均線支撐", (1.0 if curr['Close'] > curr['MA10'] else 0.0), "強勁", "跌破"),
                 ("[籌] 投信連買", (1.0 if chip_data and chip_data['it'] else 0.0), "佈局中", "無動作"),
                 ("[籌] 外資波段", (1.0 if chip_data and chip_data['fg'] else 0.0), "加碼中", "調節中"),
                 ("[籌] 法人集結", (1.0 if chip_data and chip_data['inst'] else 0.0), "共識買", "分散"),
                 ("[籌] 攻擊量能", (1.0 if curr['Volume'] > curr['VMA20'] * 1.3 else 0.0), "爆量", "量縮"),
-                ("[籌] 資金匯集", (1.0 if curr['OBV'] > df['OBV'].tail(5).mean() else 0.0), "匯入", "流出"),
-                ("均線支撐", (1.0 if curr['Close'] > curr['MA10'] else 0.0), "強勁", "跌破")
+                ("[籌] 資金匯集", (1.0 if curr['OBV'] > df['OBV'].tail(5).mean() else 0.0), "匯入", "流出")
             ]
             score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
-
-            # 得分與評論
             rating = "🚀 強勢標的" if score >= 70 else "⚖️ 穩健標的" if score >= 50 else "⚠️ 觀望標的"
+            
             st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating}")
             st.write(f"💬 分析評論：{'多空共鳴，適合順勢操作。' if score >= 70 else '格局穩定，建議分批佈局。' if score >= 50 else '訊號疲弱，建議保守觀望。'}")
 
-            # 數據顯示
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("現價", f"{float(curr['Close']):.2f}")
-            c2.metric("建議買點", f"{entry_p:.2f}")
-            with c3:
-                st.markdown(f'<div style="display:flex;flex-direction:column;"><span style="color:gray;font-size:0.8rem;">止損位</span><span style="color:green;font-size:1.5rem;font-weight:bold;">{sl_p:.2f}</span></div>', unsafe_allow_html=True)
-            with c4:
-                st.markdown(f'<div style="display:flex;flex-direction:column;"><span style="color:gray;font-size:0.8rem;">獲利目標</span><span style="color:red;font-size:1.5rem;font-weight:bold;">{tp_p:.2f}</span></div>', unsafe_allow_html=True)
+            # --- B. 統一特大數據區 ---
+            dc1, dc2, dc3, dc4 = st.columns(4)
+            data_items = [
+                ("現價", f"{float(curr['Close']):.2f}", "#FFFFFF"),
+                ("建議買點", f"{entry_p:.2f}", "#FFFFFF"),
+                ("止損位", f"{sl_p:.2f}", "#4ade80"), # 亮綠色
+                ("獲利目標", f"{tp_p:.2f}", "#f87171") # 亮紅色
+            ]
+            for idx, (label, val, color) in enumerate(data_items):
+                cols = [dc1, dc2, dc3, dc4]
+                cols[idx].markdown(f"""
+                    <div class="metric-container">
+                        <div class="metric-label">{label}</div>
+                        <div class="metric-value" style="color: {color};">{val}</div>
+                    </div>
+                """, unsafe_allow_html=True)
 
-            # 圖表
+            # --- C. 技術分析圖 (白色背景) ---
             fig, ax = plt.subplots(figsize=(10, 4.5))
             df_p = df.tail(65)
-            ax.plot(df_p.index, df_p['BB_up'], color='#e74c3c', ls='--', alpha=0.3)
-            ax.plot(df_p.index, df_p['BB_low'], color='#27ae60', ls='--', alpha=0.3)
-            ax.plot(df_p.index, df_p['Close'], color='#2c3e50', lw=2)
-            ax.axhline(entry_p, color='#2980b9', ls='-')
-            ax.axhline(sl_p, color='green', ls='--')
-            ax.axhline(tp_p, color='red', ls='--')
-            ax.set_title(f"{stock_name} ({sid}) 分析圖")
+            # 背景色強制設為白色
+            fig.patch.set_facecolor('white')
+            ax.set_facecolor('#ffffff')
+            
+            ax.plot(df_p.index, df_p['BB_up'], color='#e74c3c', ls='--', alpha=0.3, label='布林上軌')
+            ax.plot(df_p.index, df_p['BB_low'], color='#27ae60', ls='--', alpha=0.3, label='布林下軌')
+            ax.plot(df_p.index, df_p['Close'], color='#2d3436', lw=2.5, label='收盤價')
+            ax.axhline(entry_p, color='#0984e3', ls='-', lw=1.5, label='建議買點')
+            ax.axhline(sl_p, color='#27ae60', ls='--', lw=1.5, label='止損位')
+            ax.axhline(tp_p, color='#d63031', ls='--', lw=1.5, label='獲利目標')
+            ax.set_title(f"{stock_name} ({sid}) 技術分析圖", color='black', fontsize=12)
+            ax.grid(True, linestyle=':', alpha=0.6)
+            ax.legend(prop={'size': 8}, loc='upper left')
             st.pyplot(fig)
 
-            # 詳細診斷 (紅正/綠負)
+            # --- D. 詳細指標診斷 (高對比紅正綠負) ---
             st.markdown("### 詳細指標診斷")
             ind_c1, ind_c2 = st.columns(2)
             for idx, it in enumerate(indicator_list):
                 col = ind_c1 if idx < 13 else ind_c2
                 icon = "🔴" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🟢"
-                color = "red" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "green"
-                col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{it[2] if it[1] == 1.0 else it[3] if it[1] == 0.5 else it[-1]}</span>", unsafe_allow_html=True)
-
+                status = it[2] if it[1] == 1.0 else (it[3] if it[1] == 0.5 else it[-1])
+                color = "#ff4d4d" if it[1] == 1.0 else "#fbbf24" if it[1] == 0.5 else "#4ade80"
+                col.markdown(f"""
+                    <div class="indicator-row">
+                        {icon} <span style="color:#94a3b8;">{it[0]}:</span> 
+                        <span style="color:{color}; font-weight:bold;">{status}</span>
+                    </div>
+                """, unsafe_allow_html=True)
