@@ -32,7 +32,7 @@ st.markdown("""
     /* 統一按鈕與輸入框的容器寬度與對齊位置 */
     /* 這裡使用 flex-start 並配合 margin-left 確保兩者在同一條垂直線上 */
     [data-testid="stSidebar"] .stTextInput, [data-testid="stSidebar"] .stButton {
-        width: 150px !important;
+        width: 120px !important;
         margin-left: 45px !important; /* 這裡的數值可根據你的螢幕手動微調，確保與輸入框齊平 */
         margin-right: auto !important;
         padding: 0 !important;
@@ -41,8 +41,8 @@ st.markdown("""
     /* 調整輸入框樣式 */
     [data-testid="stSidebar"] input {
         height: 35px !important;
-        width: 150px !important;
-        font-size: 0.9rem !important;
+        width: 120px !important;
+        font-size: 1.2rem !important;
         text-align: center !important;
         border-radius: 2px !important;
         margin-bottom: 4px !important;
@@ -265,4 +265,5 @@ if analyze_btn and queries:
                 icon = "🔴" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🟢"
                 color = "red" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "green"
                 col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{it[2] if it[1] == 1.0 else it[3] if it[1] == 0.5 else it[-1]}</span>", unsafe_allow_html=True)
+
 
