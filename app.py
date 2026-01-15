@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 # 頁面設定
 st.set_page_config(page_title="台股決策分析系統", layout="wide")
 
-# --- CSS 修飾：按鈕置頂、縮小間距、對齊寬高 ---
+# --- CSS 修飾：極致緊湊排版，按鈕與框完全對齊 ---
 st.markdown("""
     <style>
     /* 側邊欄背景與文字顏色 */
@@ -29,40 +29,41 @@ st.markdown("""
         display: none;
     }
     
-    /* 調整輸入框容器：寬度 50% 並置中，縮小間距 (20px) */
-    [data-testid="stSidebar"] .stTextInput {
-        width: 50% !important;
+    /* 調整輸入框與按鈕容器：固定寬度並置中 */
+    [data-testid="stSidebar"] .stTextInput, [data-testid="stSidebar"] .stButton {
+        width: 150px !important;
         margin: 0 auto !important;
-        margin-bottom: 20px !important;
+        /* 縮小間距：設定極小的垂直外距 */
+        margin-bottom: 8px !important;
     }
 
     /* 調整輸入框樣式 */
     [data-testid="stSidebar"] input {
         height: 35px !important;
+        width: 150px !important;
         font-size: 0.9rem !important;
         text-align: center !important;
         border-radius: 2px !important;
     }
 
-    /* 啟動分析按鈕：置頂且寬高對齊輸入框 */
+    /* 啟動分析按鈕：與輸入框完全一致 */
     [data-testid="stSidebar"] button {
         background-color: #e67e22 !important;
         color: white !important;
         font-weight: bold !important;
-        width: 50% !important;
+        width: 150px !important;
         height: 35px !important;
         margin: 0 auto !important;
         display: block !important;
         border-radius: 2px !important;
         border: none !important;
         padding: 0 !important;
-        margin-top: 10px !important;
-        margin-bottom: 30px !important; /* 按鈕與第一個框的距離 */
+        margin-bottom: 15px !important; /* 按鈕與第一個輸入框的距離稍微拉開一點點 */
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 1. 字體設定 ---
+# --- 1. 字體設定 (解決圖表方塊字) ---
 def set_mpl_chinese():
     font_file = 'msjh.ttc' 
     if os.path.exists(font_file):
@@ -75,10 +76,11 @@ def set_mpl_chinese():
 
 set_mpl_chinese()
 
+# --- 2. 輔助工具：價格對齊 0.05 ---
 def round_stock_price(price):
     return np.round(price * 20) / 20
 
-# --- 2. 核心分析引擎 ---
+# --- 3. 核心引擎 ---
 class StockEngine:
     def __init__(self):
         self.fm_api = DataLoader()
@@ -139,17 +141,15 @@ class StockEngine:
             }
         except: return None
 
-# --- 3. UI 介面 ---
+# --- 4. UI 介面 ---
 st.title("🚀 台股決策分析系統")
 
 with st.sidebar:
-    # 標題置中
     st.markdown("<h3 style='color:#fcf3cf; text-align:center;'>代碼/名稱</h3>", unsafe_allow_html=True)
     
-    # 按鈕放置於最上方
+    # 按鈕擺放在第一個輸入框上方
     analyze_btn = st.button("啟動分析")
     
-    # 10 個輸入框
     default_vals = ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
     queries = []
     for i in range(10):
@@ -244,7 +244,7 @@ if analyze_btn and queries:
             ax.set_title(f"{stock_name} ({sid}) 分析圖")
             st.pyplot(fig)
 
-            # 25 項指標 (紅正/綠負)
+            # 25 項指標 (顏色對調)
             st.markdown("### 詳細指標診斷")
             ind_c1, ind_c2 = st.columns(2)
             for idx, it in enumerate(indicator_list):
