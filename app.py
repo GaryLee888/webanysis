@@ -42,10 +42,10 @@ st.markdown("""
     [data-testid="stSidebar"] input {
         height: 35px !important;
         width: 120px !important;
-        font-size: 1.2rem !important;
+        font-size: 1.5rem !important;
         text-align: center !important;
         border-radius: 2px !important;
-        margin-bottom: 4px !important;
+        margin-bottom: 3px !important;
     }
 
     /* 啟動分析按鈕：取消置中，對齊左邊 */
@@ -265,5 +265,6 @@ if analyze_btn and queries:
                 icon = "🔴" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🟢"
                 color = "red" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "green"
                 col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{it[2] if it[1] == 1.0 else it[3] if it[1] == 0.5 else it[-1]}</span>", unsafe_allow_html=True)
+
 
 
