@@ -13,7 +13,7 @@ from FinMind.data import DataLoader
 warnings.filterwarnings("ignore")
 
 # 頁面設定
-st.set_page_config(page_title="台股全方位決策系統", layout="wide")
+st.set_page_config(page_title="台股決策分析系統", layout="wide")
 
 # --- 1. 字體設定 (解決圖表方塊字) ---
 def set_mpl_chinese():
@@ -97,14 +97,16 @@ class StockEngine:
 st.title("🚀 台股決策分析系統")
 
 with st.sidebar:
-    st.header("🔍 股票清單 (上限5個)")
+    st.header("🔍 股票清單")
     default_vals = ["2330", "2317", "2454", "6223", "2603"]
     queries = []
     
-    # 輸入框縮小至 5 個，單一垂直排列
+    # 輸入框排列：不換行，每個 8 字元寬度
+    cols = st.columns(5)
     for i in range(5):
-        val = st.text_input(f"{i+1}:", value=default_vals[i], key=f"in_{i}")
-        if val.strip(): queries.append(val.strip())
+        with cols[i]:
+            val = st.text_input(f"{i+1}:", value=default_vals[i], key=f"in_{i}")
+            if val.strip(): queries.append(val.strip())
             
     analyze_btn = st.button("啟動分析", type="primary", use_container_width=True)
 
@@ -137,7 +139,7 @@ if analyze_btn and queries:
             sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
             tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
 
-            # 指標計算
+            # 指標清單
             indicator_list = [
                 ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
                 ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
@@ -167,18 +169,35 @@ if analyze_btn and queries:
             ]
             score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
 
-            # --- A. 得分與評論直接接著顯示 ---
+            # --- A. 得分與評論 (換行顯示) ---
             rating = "🚀 強勢標的" if score >= 70 else "⚖️ 穩健標的" if score >= 50 else "⚠️ 觀望標的"
             comment = "多空共鳴，適合順勢操作。" if score >= 70 else "格局穩定，建議分批佈局。" if score >= 50 else "訊號疲弱，建議保守觀望。"
             
-            st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating} | {comment}")
+            st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating}")
+            st.write(f"💬 分析評論：{comment}")
 
             # --- B. 價格數據卡片 ---
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("現價", f"{float(curr['Close']):.2f}")
             c2.metric("建議買點", f"{entry_p:.2f}")
-            c3.metric("止損位", f"{sl_p:.2f}")
-            c4.metric("獲利目標", f"{tp_p:.2f}")
+            
+            # 止損位用綠色
+            with c3:
+                st.markdown(f"""
+                <div style="display: flex; flex-direction: column;">
+                    <span style="color: gray; font-size: 0.8rem;">止損位</span>
+                    <span style="color: green; font-size: 1.5rem; font-weight: bold;">{sl_p:.2f}</span>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # 獲利目標用紅色
+            with c4:
+                st.markdown(f"""
+                <div style="display: flex; flex-direction: column;">
+                    <span style="color: gray; font-size: 0.8rem;">獲利目標</span>
+                    <span style="color: red; font-size: 1.5rem; font-weight: bold;">{tp_p:.2f}</span>
+                </div>
+                """, unsafe_allow_html=True)
 
             # --- C. K線圖 ---
             fig, ax = plt.subplots(figsize=(10, 4.5))
@@ -187,17 +206,20 @@ if analyze_btn and queries:
             ax.plot(df_p.index, df_p['BB_low'], color='#27ae60', ls='--', alpha=0.3)
             ax.plot(df_p.index, df_p['Close'], color='#2c3e50', lw=2)
             ax.axhline(entry_p, color='#2980b9', ls='-', label='Entry')
-            ax.axhline(sl_p, color='#c0392b', ls='--', label='SL')
-            ax.axhline(tp_p, color='#27ae60', ls='--', label='TP')
+            ax.axhline(sl_p, color='green', ls='--', label='SL')
+            ax.axhline(tp_p, color='red', ls='--', label='TP')
             ax.set_title(f"{stock_name} ({sid}) 分析圖")
             st.pyplot(fig)
 
-            # --- D. 25 項指標 (位置不變) ---
+            # --- D. 25 項指標 (顏色對調版) ---
             st.markdown("### 詳細指標診斷")
             ind_c1, ind_c2 = st.columns(2)
             for idx, it in enumerate(indicator_list):
                 col = ind_c1 if idx < 13 else ind_c2
-                icon = "🟢" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🔴"
+                
+                # 顏色邏輯對調：正向用紅色 (台股習慣)，負向用綠色
+                icon = "🔴" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🟢"
                 status = it[2] if it[1] == 1.0 else (it[3] if it[1] == 0.5 else it[-1])
-                color = "green" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "red"
+                color = "red" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "green"
+                
                 col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{status}</span>", unsafe_allow_html=True)
