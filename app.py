@@ -15,29 +15,54 @@ warnings.filterwarnings("ignore")
 # 頁面設定
 st.set_page_config(page_title="台股決策分析系統", layout="wide")
 
-# --- 自定義 CSS：讓編號與輸入框緊接著排列 ---
+# --- CSS 修飾：完全模擬參考圖中的緊湊排列與顏色 ---
 st.markdown("""
     <style>
-    /* 隱藏標籤並讓輸入框更緊湊 */
-    div[data-testid="stSidebar"] div[data-testid="column"] {
-        display: flex;
-        align-items: center;
-        margin-bottom: -15px;
+    /* 側邊欄背景與文字顏色 */
+    [data-testid="stSidebar"] {
+        background-color: #1c2833;
+        color: #fcf3cf;
     }
-    div[data-testid="stSidebar"] .stTextInput label {
+    
+    /* 隱藏預設標籤並讓元件對齊 */
+    [data-testid="stSidebar"] .stTextInput label {
         display: none;
     }
-    div[data-testid="stSidebar"] .stTextInput div {
-        margin-top: 0px !important;
+    
+    /* 調整水平區塊的垂直邊距，讓 10 行更緊湊 */
+    [data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] {
+        gap: 0px !important;
+        align-items: center !important;
+        margin-bottom: -10px !important;
     }
-    /* 設定編號文字樣式 */
-    .row-label {
+
+    /* 編號樣式設定 */
+    .num-label {
+        font-family: "微軟正黑體", sans-serif;
+        font-size: 1rem;
+        font-weight: bold;
         color: #fcf3cf;
-        font-family: "Verdana";
-        font-size: 0.9rem;
-        margin-right: 10px;
-        min-width: 25px;
+        padding-top: 5px;
         text-align: right;
+        width: 100%;
+    }
+
+    /* 調整輸入框高度與字體 */
+    [data-testid="stSidebar"] input {
+        height: 30px !important;
+        font-size: 0.9rem !important;
+        padding: 5px !important;
+        border-radius: 2px !important;
+    }
+
+    /* 啟動分析按鈕樣式 */
+    [data-testid="stSidebar"] button {
+        background-color: #e67e22 !important;
+        color: white !important;
+        border-radius: 3px !important;
+        font-weight: bold !important;
+        border: none !important;
+        margin-top: 20px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -124,22 +149,23 @@ class StockEngine:
 st.title("🚀 台股決策分析系統")
 
 with st.sidebar:
-    st.markdown("<p style='color:#fcf3cf; font-weight:bold; font-size:1.1rem;'>代碼/名稱</p>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color:#fcf3cf; text-align:center;'>代碼/名稱</h3>", unsafe_allow_html=True)
+    
     default_vals = ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
     queries = []
     
-    # 使用 columns 來配置「數字」與「輸入框」緊接在同一行
+    # 完全模擬參考圖：編號與輸入框緊密水平排列
     for i in range(10):
-        c1, c2 = st.columns([1, 4])
+        # 使用 column 分配寬度，[1, 3] 讓編號佔比小
+        c1, c2 = st.columns([1, 3])
         with c1:
-            st.markdown(f'<p class="row-label">{i+1}:</p>', unsafe_allow_html=True)
+            st.markdown(f"<div class='num-label'>{i+1}:</div>", unsafe_allow_html=True)
         with c2:
             val = st.text_input("", value=default_vals[i], key=f"in_{i}")
             if val.strip():
                 queries.append(val.strip())
             
-    st.markdown("<br>", unsafe_allow_html=True)
-    analyze_btn = st.button("啟動分析", type="primary", use_container_width=True)
+    analyze_btn = st.button("啟動分析", use_container_width=True)
 
 engine = StockEngine()
 
@@ -164,10 +190,12 @@ if analyze_btn and queries:
             chip_data = engine.fetch_chips(sid)
             curr, prev = df.iloc[-1], df.iloc[-2]
             
+            # 價格對齊 0.05
             entry_p = round_stock_price((curr['MA20'] + curr['BB_up']) / 2 if curr['Close'] <= curr['BB_up'] else curr['Close'] * 0.98)
             sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
             tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
 
+            # 指標清單
             indicator_list = [
                 ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
                 ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
@@ -197,21 +225,23 @@ if analyze_btn and queries:
             ]
             score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
 
+            # 得分與評論 (換行)
             rating = "🚀 強勢標的" if score >= 70 else "⚖️ 穩健標的" if score >= 50 else "⚠️ 觀望標的"
             comment = "多空共鳴，適合順勢操作。" if score >= 70 else "格局穩定，建議分批佈局。" if score >= 50 else "訊號疲弱，建議保守觀望。"
             
             st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating}")
             st.write(f"💬 分析評論：{comment}")
 
+            # 價格數據卡片
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("現價", f"{float(curr['Close']):.2f}")
             c2.metric("建議買點", f"{entry_p:.2f}")
-            
             with c3:
-                st.markdown(f'<div style="display: flex; flex-direction: column;"><span style="color: gray; font-size: 0.8rem;">止損位</span><span style="color: green; font-size: 1.5rem; font-weight: bold;">{sl_p:.2f}</span></div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="display:flex;flex-direction:column;"><span style="color:gray;font-size:0.8rem;">止損位</span><span style="color:green;font-size:1.5rem;font-weight:bold;">{sl_p:.2f}</span></div>', unsafe_allow_html=True)
             with c4:
-                st.markdown(f'<div style="display: flex; flex-direction: column;"><span style="color: gray; font-size: 0.8rem;">獲利目標</span><span style="color: red; font-size: 1.5rem; font-weight: bold;">{tp_p:.2f}</span></div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="display:flex;flex-direction:column;"><span style="color:gray;font-size:0.8rem;">獲利目標</span><span style="color:red;font-size:1.5rem;font-weight:bold;">{tp_p:.2f}</span></div>', unsafe_allow_html=True)
 
+            # 圖表
             fig, ax = plt.subplots(figsize=(10, 4.5))
             df_p = df.tail(65)
             ax.plot(df_p.index, df_p['BB_up'], color='#e74c3c', ls='--', alpha=0.3)
@@ -223,6 +253,7 @@ if analyze_btn and queries:
             ax.set_title(f"{stock_name} ({sid}) 分析圖")
             st.pyplot(fig)
 
+            # 詳細指標 (台股習慣紅正🟢綠負🔴，此處顏色已對調)
             st.markdown("### 詳細指標診斷")
             ind_c1, ind_c2 = st.columns(2)
             for idx, it in enumerate(indicator_list):
