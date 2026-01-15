@@ -30,10 +30,9 @@ st.markdown("""
     }
     
     /* 統一按鈕與輸入框的容器寬度與對齊位置 */
-    /* 這裡使用 flex-start 並配合 margin-left 確保兩者在同一條垂直線上 */
     [data-testid="stSidebar"] .stTextInput, [data-testid="stSidebar"] .stButton {
         width: 150px !important;
-        margin-left: 45px !important; /* 這裡的數值可根據你的螢幕手動微調，確保與輸入框齊平 */
+        margin-left: 45px !important;
         margin-right: auto !important;
         padding: 0 !important;
     }
@@ -48,7 +47,7 @@ st.markdown("""
         margin-bottom: 4px !important;
     }
 
-    /* 啟動分析按鈕：取消置中，對齊左邊 */
+    /* 啟動分析按鈕 */
     [data-testid="stSidebar"] button {
         background-color: #e67e22 !important;
         color: white !important;
@@ -81,7 +80,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 1. 字體設定 (解決圖表方塊字) ---
+# --- 1. 字體設定 ---
 def set_mpl_chinese():
     font_file = 'msjh.ttc' 
     if os.path.exists(font_file):
@@ -163,8 +162,6 @@ st.title("🚀 台股決策分析系統")
 
 with st.sidebar:
     st.markdown("<h3 class='sidebar-title'>代碼/名稱</h3>", unsafe_allow_html=True)
-    
-    # 啟動分析鈕置頂且齊平
     analyze_btn = st.button("啟動分析")
     
     default_vals = ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
@@ -201,6 +198,7 @@ if analyze_btn and queries:
             sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
             tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
 
+            # 指標清單
             indicator_list = [
                 ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
                 ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
@@ -235,14 +233,27 @@ if analyze_btn and queries:
             st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating}")
             st.write(f"💬 分析評論：{'多空共鳴，適合順勢操作。' if score >= 70 else '格局穩定，建議分批佈局。' if score >= 50 else '訊號疲弱，建議保守觀望。'}")
 
-            # 數據顯示
+            # --- 數據顯示 (統一標題與數字大小) ---
+            st.markdown("---")
             c1, c2, c3, c4 = st.columns(4)
-            c1.metric("現價", f"{float(curr['Close']):.2f}")
-            c2.metric("建議買點", f"{entry_p:.2f}")
+
+            def get_metric_html(label, value, val_color):
+                return f"""
+                <div style="display:flex; flex-direction:column; align-items:flex-start;">
+                    <span style="color:gray; font-size:0.9rem; margin-bottom: 2px;">{label}</span>
+                    <span style="color:{val_color}; font-size:1.6rem; font-weight:bold; line-height:1.2;">{value:.2f}</span>
+                </div>
+                """
+
+            with c1:
+                st.markdown(get_metric_html("現價", float(curr['Close']), "#2c3e50"), unsafe_allow_html=True)
+            with c2:
+                st.markdown(get_metric_html("建議買點", entry_p, "#2980b9"), unsafe_allow_html=True)
             with c3:
-                st.markdown(f'<div style="display:flex;flex-direction:column;"><span style="color:gray;font-size:0.8rem;">止損位</span><span style="color:green;font-size:1.5rem;font-weight:bold;">{sl_p:.2f}</span></div>', unsafe_allow_html=True)
+                st.markdown(get_metric_html("止損位", sl_p, "green"), unsafe_allow_html=True)
             with c4:
-                st.markdown(f'<div style="display:flex;flex-direction:column;"><span style="color:gray;font-size:0.8rem;">獲利目標</span><span style="color:red;font-size:1.5rem;font-weight:bold;">{tp_p:.2f}</span></div>', unsafe_allow_html=True)
+                st.markdown(get_metric_html("獲利目標", tp_p, "red"), unsafe_allow_html=True)
+            st.markdown("---")
 
             # 圖表
             fig, ax = plt.subplots(figsize=(10, 4.5))
@@ -250,13 +261,13 @@ if analyze_btn and queries:
             ax.plot(df_p.index, df_p['BB_up'], color='#e74c3c', ls='--', alpha=0.3)
             ax.plot(df_p.index, df_p['BB_low'], color='#27ae60', ls='--', alpha=0.3)
             ax.plot(df_p.index, df_p['Close'], color='#2c3e50', lw=2)
-            ax.axhline(entry_p, color='#2980b9', ls='-')
-            ax.axhline(sl_p, color='green', ls='--')
-            ax.axhline(tp_p, color='red', ls='--')
+            ax.axhline(entry_p, color='#2980b9', ls='-', alpha=0.5)
+            ax.axhline(sl_p, color='green', ls='--', alpha=0.5)
+            ax.axhline(tp_p, color='red', ls='--', alpha=0.5)
             ax.set_title(f"{stock_name} ({sid}) 分析圖")
             st.pyplot(fig)
 
-            # 詳細診斷 (紅正/綠負)
+            # 詳細診斷
             st.markdown("### 詳細指標診斷")
             ind_c1, ind_c2 = st.columns(2)
             for idx, it in enumerate(indicator_list):
