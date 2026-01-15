@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 # 頁面設定
 st.set_page_config(page_title="台股決策分析系統", layout="wide")
 
-# --- CSS 修飾：精確對齊按鈕大小與輸入框間距 ---
+# --- CSS 修飾：按鈕置頂、縮小間距、對齊寬高 ---
 st.markdown("""
     <style>
     /* 側邊欄背景與文字顏色 */
@@ -29,15 +29,14 @@ st.markdown("""
         display: none;
     }
     
-    /* 調整輸入框容器：寬度 50% 並置中 */
+    /* 調整輸入框容器：寬度 50% 並置中，縮小間距 (20px) */
     [data-testid="stSidebar"] .stTextInput {
         width: 50% !important;
         margin: 0 auto !important;
-        /* 設定下方外距為一個輸入框的高度 (約 35px) */
-        margin-bottom: 35px !important;
+        margin-bottom: 20px !important;
     }
 
-    /* 調整輸入框內文字與高度 */
+    /* 調整輸入框樣式 */
     [data-testid="stSidebar"] input {
         height: 35px !important;
         font-size: 0.9rem !important;
@@ -45,7 +44,7 @@ st.markdown("""
         border-radius: 2px !important;
     }
 
-    /* 啟動分析按鈕：強制與輸入框一樣寬高 */
+    /* 啟動分析按鈕：置頂且寬高對齊輸入框 */
     [data-testid="stSidebar"] button {
         background-color: #e67e22 !important;
         color: white !important;
@@ -57,11 +56,13 @@ st.markdown("""
         border-radius: 2px !important;
         border: none !important;
         padding: 0 !important;
+        margin-top: 10px !important;
+        margin-bottom: 30px !important; /* 按鈕與第一個框的距離 */
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 1. 字體設定 (解決圖表方塊字) ---
+# --- 1. 字體設定 ---
 def set_mpl_chinese():
     font_file = 'msjh.ttc' 
     if os.path.exists(font_file):
@@ -74,11 +75,10 @@ def set_mpl_chinese():
 
 set_mpl_chinese()
 
-# --- 2. 輔助工具：價格對齊 0.05 ---
 def round_stock_price(price):
     return np.round(price * 20) / 20
 
-# --- 3. 核心引擎 ---
+# --- 2. 核心分析引擎 ---
 class StockEngine:
     def __init__(self):
         self.fm_api = DataLoader()
@@ -139,21 +139,23 @@ class StockEngine:
             }
         except: return None
 
-# --- 4. UI 介面 ---
+# --- 3. UI 介面 ---
 st.title("🚀 台股決策分析系統")
 
 with st.sidebar:
+    # 標題置中
     st.markdown("<h3 style='color:#fcf3cf; text-align:center;'>代碼/名稱</h3>", unsafe_allow_html=True)
     
+    # 按鈕放置於最上方
+    analyze_btn = st.button("啟動分析")
+    
+    # 10 個輸入框
     default_vals = ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
     queries = []
-    
     for i in range(10):
         val = st.text_input("", value=default_vals[i], key=f"in_{i}")
         if val.strip():
             queries.append(val.strip())
-            
-    analyze_btn = st.button("啟動分析")
 
 engine = StockEngine()
 
@@ -176,13 +178,15 @@ if analyze_btn and queries:
 
             df = engine.calculate_indicators(df_raw)
             chip_data = engine.fetch_chips(sid)
-            curr, prev = df.iloc[-1], df.iloc[-2]
+            curr = df.iloc[-1]
+            prev = df.iloc[-2]
             
+            # 價格對齊 0.05
             entry_p = round_stock_price((curr['MA20'] + curr['BB_up']) / 2 if curr['Close'] <= curr['BB_up'] else curr['Close'] * 0.98)
             sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
             tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
 
-            # 得分與評分
+            # 指標計算
             indicator_list = [
                 ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
                 ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
@@ -212,13 +216,14 @@ if analyze_btn and queries:
             ]
             score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
 
+            # 得分與評論
             rating = "🚀 強勢標的" if score >= 70 else "⚖️ 穩健標的" if score >= 50 else "⚠️ 觀望標的"
             comment = "多空共鳴，適合順勢操作。" if score >= 70 else "格局穩定，建議分批佈局。" if score >= 50 else "訊號疲弱，建議保守觀望。"
             
             st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating}")
             st.write(f"💬 分析評論：{comment}")
 
-            # 價格顯示
+            # 價格數據顯示
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("現價", f"{float(curr['Close']):.2f}")
             c2.metric("建議買點", f"{entry_p:.2f}")
@@ -239,7 +244,7 @@ if analyze_btn and queries:
             ax.set_title(f"{stock_name} ({sid}) 分析圖")
             st.pyplot(fig)
 
-            # 25 項指標 (顏色對調)
+            # 25 項指標 (紅正/綠負)
             st.markdown("### 詳細指標診斷")
             ind_c1, ind_c2 = st.columns(2)
             for idx, it in enumerate(indicator_list):
