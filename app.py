@@ -229,9 +229,9 @@ if analyze_btn and queries:
             score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
 
             # 得分與評論
-            rating = "🚀 強勢標的" if score >= 80 else "⚖️ 穩健標的" if score >= 60 else "⚠️ 觀望標的"
+            rating = "🚀 強勢標的" if score >= 75 else "⚖️ 穩健標的" if score >= 50 else "⚖️ 看看就好" if score >= 25 else "⚠️ 不要碰"
             st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating}")
-            st.write(f"💬 分析評論：{'多空共鳴，適合順勢操作。' if score >= 70 else '格局穩定，建議分批佈局。' if score >= 50 else '訊號疲弱，建議保守觀望。'}")
+            st.write(f"💬 分析評論：{'多空共鳴，適合順勢操作。' if score >= 80 else '格局穩定，建議分批佈局。' if score >= 60 else '訊號疲弱，建議保守觀望。'}")
 
             # --- 數據顯示 (統一標題與數字大小) ---
             st.markdown("---")
@@ -275,5 +275,6 @@ if analyze_btn and queries:
                 icon = "🔴" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🟢"
                 color = "red" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "green"
                 col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{it[2] if it[1] == 1.0 else it[3] if it[1] == 0.5 else it[-1]}</span>", unsafe_allow_html=True)
+
 
 
