@@ -6,36 +6,44 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import twstock
 import warnings
+import os
 from FinMind.data import DataLoader
 
 # 隱藏警告
 warnings.filterwarnings("ignore")
 
-# 頁面設定
+# 頁面設定：寬度自適應手機
 st.set_page_config(page_title="台股全方位決策系統", layout="wide")
 
-# --- 解決中文字體方塊問題 ---
+# --- 1. 徹底解決圖表方塊字 (Matplotlib 字體設定) ---
 def set_mpl_chinese():
-    # 嘗試載入 Linux 伺服器常見的開源中文字體
-    font_paths = fm.findSystemFonts()
-    target_fonts = ['DejaVu Sans', 'Noto Sans CJK JP', 'Noto Sans TC', 'Arial Unicode MS']
-    
-    # 強制設定語系防止亂碼
-    plt.rcParams['font.sans-serif'] = target_fonts + plt.rcParams['font.sans-serif']
+    font_file = 'msjh.ttc'  # 請確保此檔案已上傳至 GitHub 根目錄
+    if os.path.exists(font_file):
+        fe = fm.FontEntry(fname=font_file, name='CustomFont')
+        fm.fontManager.ttflist.insert(0, fe)
+        plt.rcParams['font.sans-serif'] = ['CustomFont']
+    else:
+        # 若無字體檔，嘗試使用 Linux 通用字體
+        plt.rcParams['font.sans-serif'] = ['Noto Sans CJK JP', 'DejaVu Sans', 'sans-serif']
+        st.sidebar.error(f"找不到字體檔 {font_file}，圖表可能出現亂碼。")
     plt.rcParams['axes.unicode_minus'] = False 
 
 set_mpl_chinese()
 
+# --- 2. 核心分析引擎 ---
 class StockEngine:
     def __init__(self):
         self.fm_api = DataLoader()
-        self.special_mapping = {"貝爾威勒": "7861", "能率亞洲": "7777", "力旺": "3529", "朋程": "8255"}
+        self.special_mapping = {
+            "貝爾威勒": "7861", "能率亞洲": "7777", 
+            "力旺": "3529", "朋程": "8255"
+        }
 
     def fetch_data(self, sid):
         for suffix in [".TWO", ".TW"]:
             try:
                 df = yf.download(f"{sid}{suffix}", period="1y", progress=False)
-                if df is not None and not df.empty and len(df) > 5:
+                if df is not None and not df.empty and len(df) > 15:
                     if isinstance(df.columns, pd.MultiIndex):
                         df.columns = df.columns.get_level_values(0)
                     return df, f"{sid}{suffix}"
@@ -45,6 +53,7 @@ class StockEngine:
     def calculate_indicators(self, df):
         df = df.copy()
         win = 20
+        # 技術指標計算 (完全移植原始邏輯)
         df['MA5'] = df['Close'].rolling(5).mean()
         df['MA10'] = df['Close'].rolling(10).mean()
         df['MA20'] = df['Close'].rolling(win).mean()
@@ -52,17 +61,22 @@ class StockEngine:
         df['BB_up'] = df['MA20'] + (std * 2)
         df['BB_low'] = df['MA20'] - (std * 2)
         df['BB_width'] = (df['BB_up'] - df['BB_low']) / df['MA20'].replace(0, 1)
+        
         tr = pd.concat([df['High']-df['Low'], (df['High']-df['Close'].shift()).abs(), (df['Low']-df['Close'].shift()).abs()], axis=1).max(axis=1)
         df['ATR'] = tr.rolling(14).mean()
+        
         low_9, high_9 = df['Low'].rolling(9).min(), df['High'].rolling(9).max()
         df['K'] = ((df['Close'] - low_9) / (high_9 - low_9).replace(0, 1) * 100).ewm(com=2).mean()
         df['D'] = df['K'].ewm(com=2).mean()
+        
         ema12, ema26 = df['Close'].ewm(span=12).mean(), df['Close'].ewm(span=26).mean()
         df['MACD_hist'] = (ema12 - ema26) - (ema12 - ema26).ewm(span=9).mean()
+        
         delta = df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
         df['RSI'] = 100 - (100 / (1 + (gain / loss).replace(0, 1)))
+        
         df['OBV'] = (np.sign(df['Close'].diff()) * df['Volume']).fillna(0).cumsum()
         df['MFI'] = 50 + (df['Close'].diff().rolling(14).mean() * 10)
         df['VMA20'] = df['Volume'].rolling(win).mean()
@@ -71,6 +85,7 @@ class StockEngine:
         df['Vol_Ratio'] = (df['Volume'] / df['VMA20'].shift(1)).fillna(1)
         df['ROC'] = df['Close'].pct_change(12) * 100
         df['SR_Rank'] = (df['Close'] - df['Close'].rolling(60).min()) / (df['Close'].rolling(60).max() - df['Close'].rolling(60).min()).replace(0, 1)
+        
         return df.fillna(method='ffill').fillna(method='bfill')
 
     def fetch_chips(self, sid):
@@ -85,72 +100,79 @@ class StockEngine:
             return {"it": it_val, "fg": fg_val, "inst": all_val}
         except: return None
 
-# --- UI ---
-st.title("🚀 台股全方位決策系統 (Mobile Web)")
+# --- 3. UI 介面佈局 ---
+st.title("🚀 台股全方位決策系統 (專業 Web 版)")
 
+# 側邊欄：手機版會隱藏在左上角選單
 with st.sidebar:
-    st.header("清單設定")
-    # 預設清單完全移植自原始程式
+    st.header("🔍 股票輸入")
     default_vals = ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
     queries = []
     for i in range(10):
-        q = st.text_input(f"{i+1}:", value=default_vals[i], key=f"in_{i}")
+        q = st.text_input(f"{i+1}:", value=default_vals[i], key=f"q_{i}")
         if q.strip(): queries.append(q.strip())
-    analyze_btn = st.button("啟動分析", type="primary")
+    
+    analyze_btn = st.button("啟動批次分析", type="primary", use_container_width=True)
 
 engine = StockEngine()
 
 if analyze_btn:
     if not queries:
-        st.warning("請至少輸入一個代碼")
+        st.warning("請在側邊欄輸入股票代碼")
     else:
+        # 分頁顯示
         tabs = st.tabs([f" {q} " for q in queries])
+        
         for i, query in enumerate(queries):
             with tabs[i]:
+                # 代碼轉換
                 sid = engine.special_mapping.get(query, query)
-                stock_name = query
+                stock_display = query
                 if not sid.isdigit():
                     for code, info in twstock.codes.items():
-                        if query in info.name: sid = code; stock_name = info.name; break
+                        if query in info.name: sid = code; stock_display = info.name; break
                 elif sid in twstock.codes:
-                    stock_name = twstock.codes[sid].name
+                    stock_display = twstock.codes[sid].name
 
+                # 抓取數據
                 df_raw, ticker_str = engine.fetch_data(sid)
-                if df_raw is None or len(df_raw) < 20:
-                    st.error(f"無法抓取 {stock_name}({sid}) 數據")
+                if df_raw is None:
+                    st.error(f"無法載入 {stock_display} ({sid})，請檢查代碼或網路。")
                     continue
 
                 df = engine.calculate_indicators(df_raw)
                 chip_data = engine.fetch_chips(sid)
+                
                 curr = df.iloc[-1]
                 prev = df.iloc[-2]
-                
-                # 策略建議價格
+
+                # 策略點位 (與原始程式一致)
                 entry_p = float((curr['MA20'] + curr['BB_up']) / 2 if curr['Close'] <= curr['BB_up'] else curr['Close'] * 0.98)
                 sl_p = entry_p - (float(curr['ATR']) * 2.2)
                 tp_p = entry_p + (entry_p - sl_p) * 2.0
 
-                # 頂部數據卡片
+                # --- 頂部摘要卡片 ---
                 c1, c2, c3, c4 = st.columns(4)
                 c1.metric("現價", f"{float(curr['Close']):.2f}")
                 c2.metric("建議買點", f"{entry_p:.2f}")
-                c3.metric("止損位", f"{sl_p:.2f}")
-                c4.metric("獲利目標", f"{tp_p:.2f}")
+                c3.metric("止損(紅)", f"{sl_p:.2f}")
+                c4.metric("獲利(綠)", f"{tp_p:.2f}")
 
-                # 圖表（移除中文字體依賴，改用英文 Label 以保證不亂碼，或使用系統支援字體）
-                fig, ax = plt.subplots(figsize=(10, 5))
+                # --- K線圖表 ---
+                fig, ax = plt.subplots(figsize=(12, 6))
                 df_p = df.tail(65)
                 ax.plot(df_p.index, df_p['BB_up'], color='#e74c3c', ls='--', alpha=0.3)
                 ax.plot(df_p.index, df_p['BB_low'], color='#27ae60', ls='--', alpha=0.3)
                 ax.fill_between(df_p.index, df_p['BB_up'], df_p['BB_low'], color='#ecf0f1', alpha=0.2)
-                ax.plot(df_p.index, df_p['Close'], color='#2c3e50', lw=2)
-                ax.axhline(entry_p, color='#2980b9', ls='-', label='Entry')
-                ax.axhline(sl_p, color='#c0392b', ls='--', label='SL')
-                ax.axhline(tp_p, color='#27ae60', ls='--', label='TP')
-                ax.set_title(f"Analysis: {stock_name} ({sid})")
+                ax.plot(df_p.index, df_p['Close'], color='#2c3e50', lw=2.5, label='收盤價')
+                ax.axhline(entry_p, color='#2980b9', ls='-', lw=1.5, label='買點')
+                ax.axhline(sl_p, color='#c0392b', ls='--', lw=1.5, label='止損')
+                ax.axhline(tp_p, color='#27ae60', ls='--', lw=1.5, label='獲利')
+                ax.set_title(f"{stock_display} ({sid}) 決策分析圖", fontsize=14)
+                ax.legend(loc='best')
                 st.pyplot(fig)
 
-                # --- 完全移植 25 項指標 ---
+                # --- 25 項多空指標診斷 ---
                 indicator_list = [
                     ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
                     ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
@@ -182,17 +204,18 @@ if analyze_btn:
                 total_pts = sum([it[1] for it in indicator_list])
                 score = int((total_pts / 25) * 100)
 
-                st.subheader(f"指標綜合診斷 ({score} 分)")
-                
-                # 顯示評級
-                if score >= 70: st.success("🚀 強勢標的")
-                elif score >= 50: st.warning("⚖️ 穩健標的")
-                else: st.error("⚠️ 觀望標的")
+                st.markdown("---")
+                st.subheader(f"📊 綜合診斷得分：{score} 分")
+                if score >= 70: st.success("🚀 強勢標的：指標高度共鳴，建議順勢操作。")
+                elif score >= 50: st.warning("⚖️ 穩健標的：趨勢尚可，建議分批佈局。")
+                else: st.error("⚠️ 觀望標的：指標偏弱，建議等待訊號轉強。")
 
-                # 分兩欄顯示 25 項指標
-                idx_cols = st.columns(2)
-                for j, item in enumerate(indicator_list):
-                    col = idx_cols[0] if j < 13 else idx_cols[1]
-                    label = item[3] if item[1] == 1.0 else (item[4] if item[1] == 0.5 else item[-1])
-                    icon = "🟢" if item[1] == 1.0 else "🟠" if item[1] == 0.5 else "🔴"
-                    col.write(f"{icon} {item[0]}: **{label}**")
+                # 分兩欄顯示詳細指標 (手機會自動變成一欄)
+                ind_c1, ind_c2 = st.columns(2)
+                for idx, it in enumerate(indicator_list):
+                    col = ind_c1 if idx < 13 else ind_c2
+                    icon = "🟢" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🔴"
+                    txt = it[2] if it[1] == 1.0 else (it[3] if it[1] == 0.5 else it[-1])
+                    # 使用 Markdown 加顏色提升可讀性
+                    color = "green" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "red"
+                    col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{txt}</span>", unsafe_allow_html=True)
