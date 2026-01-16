@@ -13,7 +13,7 @@ from FinMind.data import DataLoader
 warnings.filterwarnings("ignore")
 
 # 頁面設定
-st.set_page_config(page_title="台股決策分析系統", layout="wide")
+st.set_page_config(page_title="分析系統", layout="wide")
 
 # --- CSS 修飾 ---
 st.markdown("""
@@ -21,20 +21,20 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1c2833; color: #fcf3cf; }
     [data-testid="stSidebar"] .stTextInput label { display: none; }
     [data-testid="stSidebar"] .stTextInput, [data-testid="stSidebar"] .stButton {
-        width: 150px !important; margin-left: 45px !important; margin-right: auto !important; padding: 0 !important;
+        width: 130px !important; margin-left: 45px !important; margin-right: auto !important; padding: 0 !important;
     }
     [data-testid="stSidebar"] input {
-        height: 35px !important; width: 150px !important; font-size: 0.9rem !important;
+        height: 35px !important; width: 130px !important; font-size: 1.3rem !important;
         text-align: center !important; border-radius: 2px !important; margin-bottom: 4px !important;
     }
     [data-testid="stSidebar"] button {
         background-color: #e67e22 !important; color: white !important; font-weight: bold !important;
-        width: 150px !important; height: 35px !important; display: block !important;
+        width: 130px !important; height: 35px !important; display: block !important;
         border-radius: 2px !important; border: none !important; line-height: 35px !important;
         padding: 0 !important; margin-top: 0px !important; margin-bottom: 8px !important; text-align: center !important;
     }
-    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: 4px !important; }
-    .sidebar-title { color: #fcf3cf; text-align: center; width: 150px; margin-left: 45px; margin-bottom: 10px; }
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: 10px !important; }
+    .sidebar-title { color: #fcf3cf; text-align: center; width: 130px; margin-left: 45px; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -251,3 +251,4 @@ if analyze_btn and queries:
                 icon = "🔴" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🟢"
                 color = "red" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "green"
                 col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{it[2] if it[1] == 1.0 else it[3] if it[1] == 0.5 else it[-1]}</span>", unsafe_allow_html=True)
+
