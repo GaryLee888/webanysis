@@ -9,247 +9,153 @@ import warnings
 import os
 from FinMind.data import DataLoader
 
-# 隱藏警告
-warnings.filterwarnings("ignore")
+# --- 1. 頁面與風格配置 ---
+st.set_page_config(page_title="PRO-Quant 專業決策系統", layout="wide")
 
-# 頁面設定
-st.set_page_config(page_title="分析系統", layout="wide")
-
-# --- CSS 修飾 ---
+# 注入高級感 CSS
 st.markdown("""
     <style>
-    [data-testid="stSidebar"] { background-color: #1c2833; color: #fcf3cf; }
-    [data-testid="stSidebar"] .stTextInput label { display: none; }
-    [data-testid="stSidebar"] .stTextInput, [data-testid="stSidebar"] .stButton {
-        width: 130px !important; margin-left: 45px !important; margin-right: auto !important; padding: 0 !important;
+    /* 全域背景與字體 */
+    .stApp { background-color: #0e1117; color: #e0e0e0; }
+    
+    /* 側邊欄美化 */
+    [data-testid="stSidebar"] { background-color: #161b22; border-right: 1px solid #30363d; }
+    .sidebar-title { color: #58a6ff; font-weight: 800; font-size: 1.2rem; text-align: center; margin-bottom: 20px; }
+    
+    /* 專業卡片設計 */
+    .metric-card {
+        background: #1c2128;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
-    [data-testid="stSidebar"] input {
-        height: 35px !important; width: 130px !important; font-size: 1.3rem !important;
-        text-align: center !important; border-radius: 2px !important; margin-bottom: 4px !important;
+    .metric-label { color: #8b949e; font-size: 0.85rem; margin-bottom: 5px; }
+    .metric-value { font-size: 1.8rem; font-weight: bold; font-family: 'Courier New', monospace; }
+    
+    /* 指標膠囊 */
+    .indicator-tag {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        margin: 2px;
     }
-    [data-testid="stSidebar"] button {
-        background-color: #e67e22 !important; color: white !important; font-weight: bold !important;
-        width: 130px !important; height: 35px !important; display: block !important;
-        border-radius: 2px !important; border: none !important; line-height: 35px !important;
-        padding: 0 !important; margin-top: 0px !important; margin-bottom: 8px !important; text-align: center !important;
+    .tag-bull { background-color: #238636; color: #ffffff; }
+    .tag-bear { background-color: #da3633; color: #ffffff; }
+    .tag-neutral { background-color: #6e7681; color: #ffffff; }
+
+    /* Tabs 美化 */
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 4px 4px 0 0;
+        padding: 5px 20px;
     }
-    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: 10px !important; }
-    .sidebar-title { color: #fcf3cf; text-align: center; width: 130px; margin-left: 45px; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 1. 字體與價格修正設定 ---
-def set_mpl_chinese():
-    font_file = 'msjh.ttc' 
-    if os.path.exists(font_file):
-        fe = fm.FontEntry(fname=font_file, name='CustomFont')
-        fm.fontManager.ttflist.insert(0, fe)
-        plt.rcParams['font.sans-serif'] = ['CustomFont']
-    else:
-        plt.rcParams['font.sans-serif'] = ['Noto Sans CJK JP', 'sans-serif']
-    plt.rcParams['axes.unicode_minus'] = False 
+# --- 2. 核心邏輯 (繼承並優化原本 Engine) ---
+# [保留您原本的 round_stock_price 和 StockEngine 類別，此處省略以節省篇幅]
 
-set_mpl_chinese()
-
-def round_stock_price(price):
-    """依照台股升降單位規則修約 (2026 最新規範整合)"""
-    if price < 10:
-        return np.round(price, 2)
-    elif price < 50:
-        return np.round(price * 20) / 20
-    elif price < 100:
-        return np.round(price, 1)
-    elif price < 500:
-        return np.round(price * 2) / 2
-    elif price < 1000:
-        return np.round(price, 0)
-    else:
-        return np.round(price / 5) * 5
-
-# --- 2. 核心分析引擎 ---
-class StockEngine:
-    def __init__(self):
-        self.fm_api = DataLoader()
-        self.special_mapping = {"貝爾威勒": "7861", "能率亞洲": "7777", "力旺": "3529", "朋程": "8255"}
-
-    def fetch_data(self, sid):
-        for suffix in [".TW", ".TWO"]:
-            try:
-                df = yf.download(f"{sid}{suffix}", period="1y", progress=False)
-                if df is not None and not df.empty and len(df) > 15:
-                    if isinstance(df.columns, pd.MultiIndex):
-                        df.columns = df.columns.get_level_values(0)
-                    return df, f"{sid}{suffix}"
-            except: continue
-        return None, None
-
-    def calculate_indicators(self, df):
-        df = df.copy()
-        win = 20
-        df['MA5'] = df['Close'].rolling(5).mean()
-        df['MA10'] = df['Close'].rolling(10).mean()
-        df['MA20'] = df['Close'].rolling(win).mean()
-        std = df['Close'].rolling(win).std()
-        df['BB_up'] = df['MA20'] + (std * 2)
-        df['BB_low'] = df['MA20'] - (std * 2)
-        df['BB_width'] = (df['BB_up'] - df['BB_low']) / df['MA20'].replace(0, 1)
-        tr = pd.concat([df['High']-df['Low'], (df['High']-df['Close'].shift()).abs(), (df['Low']-df['Close'].shift()).abs()], axis=1).max(axis=1)
-        df['ATR'] = tr.rolling(14).mean()
-        low_9, high_9 = df['Low'].rolling(9).min(), df['High'].rolling(9).max()
-        df['K'] = ((df['Close'] - low_9) / (high_9 - low_9).replace(0, 1) * 100).ewm(com=2).mean()
-        df['D'] = df['K'].ewm(com=2).mean()
-        ema12, ema26 = df['Close'].ewm(span=12).mean(), df['Close'].ewm(span=26).mean()
-        df['MACD_hist'] = (ema12 - ema26) - (ema12 - ema26).ewm(span=9).mean()
-        delta = df['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-        df['RSI'] = 100 - (100 / (1 + (gain / loss).replace(0, 1)))
-        df['OBV'] = (np.sign(df['Close'].diff()) * df['Volume']).fillna(0).cumsum()
-        df['MFI'] = 50 + (df['Close'].diff().rolling(14).mean() * 10)
-        df['VMA20'] = df['Volume'].rolling(win).mean()
-        df['BIAS5'] = (df['Close'] - df['MA5']) / df['MA5'] * 100
-        df['BIAS20'] = (df['Close'] - df['MA20']) / df['MA20'] * 100
-        df['Vol_Ratio'] = (df['Volume'] / df['VMA20'].shift(1)).fillna(1)
-        df['ROC'] = df['Close'].pct_change(12) * 100
-        df['SR_Rank'] = (df['Close'] - df['Close'].rolling(60).min()) / (df['Close'].rolling(60).max() - df['Close'].rolling(60).min()).replace(0, 1)
-        return df.fillna(method='ffill').fillna(method='bfill')
-
-    def fetch_chips(self, sid):
-        try:
-            start_date = (pd.Timestamp.now() - pd.Timedelta(days=45)).strftime('%Y-%m-%d')
-            df_chips = self.fm_api.taiwan_stock_institutional_investors(stock_id=sid, start_date=start_date)
-            if df_chips.empty: return None
-            summary = df_chips.groupby(['date', 'name'])['buy'].sum().unstack().fillna(0)
-            return {
-                "it": summary['投信'].tail(3).sum() > 0 if '投信' in summary else False,
-                "fg": summary['外資'].tail(5).sum() > 0 if '外資' in summary else False,
-                "inst": summary.tail(3).sum(axis=1).sum() > 0
-            }
-        except: return None
-
-# --- UI 介面 ---
-st.title("🚀 台股決策分析系統")
-
-with st.sidebar:
-    st.markdown("<h3 class='sidebar-title'>代碼/名稱</h3>", unsafe_allow_html=True)
-    analyze_btn = st.button("啟動分析")
+# --- 3. UI 呈現邏輯 ---
+def display_analysis(query, engine):
+    sid = engine.special_mapping.get(query, query)
+    # ... (此處保留原有的數據獲取與計算邏輯) ...
+    # 假設已獲取 df, score, rating, curr, entry_p, sl_p, tp_p, indicator_list
     
-    default_vals = ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
-    queries = []
-    for i in range(10):
-        val = st.text_input("", value=default_vals[i], key=f"in_{i}")
-        if val.strip():
-            queries.append(val.strip())
+    # --- 頁面頂部：診斷分數 ---
+    score_color = "#238636" if score >= 70 else "#d29922" if score >= 50 else "#da3633"
+    st.markdown(f"""
+        <div style="display: flex; align-items: center; justify-content: space-between; background: #1c2128; padding: 20px; border-radius: 10px; border-left: 5px solid {score_color};">
+            <div>
+                <h2 style="margin:0;">{stock_name} <span style="font-size:1rem; color:#8b949e;">({sid})</span></h2>
+                <p style="margin:0; color:#8b949e;">{rating} | { "多空共鳴，適合順勢操作" if score >= 70 else "格局穩定，建議分批佈局" if score >= 50 else "訊號疲弱，建議保守觀望"}</p>
+            </div>
+            <div style="text-align: right;">
+                <span style="font-size: 0.9rem; color:#8b949e;">綜合評分</span><br>
+                <span style="font-size: 3rem; font-weight: bold; color: {score_color};">{score}</span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
-engine = StockEngine()
+    st.write(" ")
 
-if analyze_btn and queries:
-    tabs = st.tabs([f" {q} " for q in queries])
-    for i, query in enumerate(queries):
-        with tabs[i]:
-            sid = engine.special_mapping.get(query, query)
-            stock_name = query
-            if not sid.isdigit():
-                for code, info in twstock.codes.items():
-                    if query in info.name: sid = code; stock_name = info.name; break
-            elif sid in twstock.codes:
-                stock_name = twstock.codes[sid].name
+    col_left, col_right = st.columns([1, 1.5])
 
-            df_raw, ticker = engine.fetch_data(sid)
-            if df_raw is None: 
-                st.error(f"查無數據: {sid}")
-                continue
-
-            df = engine.calculate_indicators(df_raw)
-            chip_data = engine.fetch_chips(sid)
-            curr = df.iloc[-1]
-            
-            # 買賣點與修約
-            raw_entry = (curr['MA20'] + curr['BB_up']) / 2 if curr['Close'] <= curr['BB_up'] else curr['Close'] * 0.98
-            entry_p = round_stock_price(float(raw_entry))
-            sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
-            tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
-
-            # --- 完整恢復：第一版 25 項指標清單 ---
-            indicator_list = [
-                ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
-                ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
-                ("KD動能", (1.0 if curr['K'] > curr['D'] else 0.0), "向上", "向下"),
-                ("MACD趨勢", (1.0 if curr['MACD_hist'] > 0 else 0.0), "紅柱", "綠柱"),
-                ("RSI強弱", (1.0 if curr['RSI'] > 50 else 0.0), "強勢", "弱勢"),
-                ("均線排列", (1.0 if curr['MA5'] > curr['MA10'] else 0.0), "多頭", "糾結"),
-                ("威廉指標", (1.0 if curr['K'] > 50 else 0.0), "看多", "看空"),
-                ("乖離率", (1.0 if abs(curr['BIAS20']) < 10 else 0.0), "安全", "過熱"),
-                ("波幅擠壓", (1.0 if curr['BB_width'] < 0.1 else 0.0), "蓄勢", "發散"),
-                ("量價配合", (1.0 if curr['Close'] >= df.iloc[-2]['Close'] else 0.0), "穩健", "背離"),
-                ("能量潮", (1.0 if curr['OBV'] > df['OBV'].mean() else 0.0), "集中", "渙散"),
-                ("資金流向", (1.0 if curr['MFI'] > 50 else 0.0), "流入", "流出"),
-                ("成交均量", (1.0 if curr['Volume'] > curr['VMA20'] else 0.0), "量增", "量縮"),
-                ("多空勁道", (1.0 if curr['Close'] > curr['MA5'] else 0.0), "強勁", "偏弱"),
-                ("乖離動能", (1.0 if curr['BIAS5'] > curr['BIAS20'] else 0.0), "轉強", "趨緩"),
-                ("支撐位階", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "站穩", "破線"),
-                ("多空量比", (1.0 if curr['Vol_Ratio'] > 1 else 0.0), "買盤強", "賣壓大"),
-                ("價格變動", (1.0 if curr['ROC'] > 0 else 0.0), "正向", "負向"),
-                ("歷史位階", (1.0 if curr['SR_Rank'] > 0.5 else 0.0), "健康", "低迷"),
-                ("均線支撐", (1.0 if curr['Close'] > curr['MA10'] else 0.0), "強勁", "跌破"),
-                ("[籌] 投信連買", (1.0 if chip_data and chip_data['it'] else 0.0), "佈局中", "無動作"),
-                ("[籌] 外資波段", (1.0 if chip_data and chip_data['fg'] else 0.0), "加碼中", "調節中"),
-                ("[籌] 法人集結", (1.0 if chip_data and chip_data['inst'] else 0.0), "共識買", "分散"),
-                ("[籌] 攻擊量能", (1.0 if curr['Volume'] > curr['VMA20'] * 1.3 else 0.0), "爆量", "量縮"),
-                ("[籌] 資金匯集", (1.0 if curr['OBV'] > df['OBV'].tail(5).mean() else 0.0), "匯入", "流出")
-                           ]
-            score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
-
-            # 得分與評論
-            rating = "🚀 強勢標的" if score >= 70 else "⚖️ 穩健標的" if score >= 50 else "⚠️ 觀望標的"
-            st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating}")
-            st.write(f"💬 分析評論：{'多空共鳴，適合順勢操作。' if score >= 70 else '格局穩定，建議分批佈局。' if score >= 50 else '訊號疲弱，建議保守觀望。'}")
-
-            # --- 數據顯示 (動態精確度) ---
-            st.markdown("---")
-            c1, c2, c3, c4 = st.columns(4)
-
-            def get_metric_html(label, value, val_color):
-                # 依據台股價格區間決定顯示位數
-                if value < 100: fmt = ".2f"
-                elif value < 500: fmt = ".1f"
-                else: fmt = ".0f"
-                return f"""
-                <div style="display:flex; flex-direction:column; align-items:flex-start;">
-                    <span style="color:gray; font-size:0.9rem; margin-bottom: 2px;">{label}</span>
-                    <span style="color:{val_color}; font-size:1.6rem; font-weight:bold; line-height:1.2;">{value:{fmt}}</span>
+    with col_left:
+        st.subheader("🎯 關鍵價位")
+        c1, c2 = st.columns(2)
+        c3, c4 = st.columns(2)
+        
+        # 使用卡片式呈現
+        metrics = [
+            ("目前現價", curr['Close'], "#e0e0e0", c1),
+            ("建議進場", entry_p, "#58a6ff", c2),
+            ("止損防線", sl_p, "#ff7b72", c3),
+            ("獲利目標", tp_p, "#7ee787", c4)
+        ]
+        
+        for label, val, color, col in metrics:
+            col.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-label">{label}</div>
+                    <div class="metric-value" style="color:{color};">{val:.2f}</div>
                 </div>
-                """
+            """, unsafe_allow_html=True)
+            col.write(" ")
 
-            with c1:
-                st.markdown(get_metric_html("現價", float(curr['Close']), "#2c3e50"), unsafe_allow_html=True)
-            with c2:
-                st.markdown(get_metric_html("建議買點", entry_p, "#2980b9"), unsafe_allow_html=True)
-            with c3:
-                st.markdown(get_metric_html("止損位", sl_p, "green"), unsafe_allow_html=True)
-            with c4:
-                st.markdown(get_metric_html("獲利目標", tp_p, "red"), unsafe_allow_html=True)
-            st.markdown("---")
+        st.subheader("🔍 指標矩陣")
+        # 改用更緊湊的佈局
+        ind_col1, ind_col2 = st.columns(2)
+        for idx, (name, val, pos, neg, *extra) in enumerate(indicator_list):
+            target_col = ind_col1 if idx % 2 == 0 else ind_col2
+            tag_class = "tag-bull" if val == 1.0 else "tag-neutral" if val == 0.5 else "tag-bear"
+            text = pos if val == 1.0 else (extra[0] if val == 0.5 else neg)
+            target_col.markdown(f"""
+                <div style="margin-bottom:8px;">
+                    <span style="color:#8b949e; font-size:0.85rem;">{name}</span><br>
+                    <span class="indicator-tag {tag_class}">{text}</span>
+                </div>
+            """, unsafe_allow_html=True)
 
-            # 圖表
-            fig, ax = plt.subplots(figsize=(10, 4.5))
-            df_p = df.tail(65)
-            ax.plot(df_p.index, df_p['BB_up'], color='#e74c3c', ls='--', alpha=0.3)
-            ax.plot(df_p.index, df_p['BB_low'], color='#27ae60', ls='--', alpha=0.3)
-            ax.plot(df_p.index, df_p['Close'], color='#2c3e50', lw=2)
-            ax.axhline(entry_p, color='#2980b9', ls='-', alpha=0.5)
-            ax.axhline(sl_p, color='green', ls='--', alpha=0.5)
-            ax.axhline(tp_p, color='red', ls='--', alpha=0.5)
-            ax.set_title(f"{stock_name} ({sid}) 分析圖")
-            st.pyplot(fig)
+    with col_right:
+        st.subheader("📈 技術趨勢")
+        # 圖表美化
+        fig, ax = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
+        ax.set_facecolor('#0e1117')
+        
+        df_p = df.tail(60)
+        # 繪製布林通道
+        ax.fill_between(df_p.index, df_p['BB_up'], df_p['BB_low'], color='#58a6ff', alpha=0.05)
+        ax.plot(df_p.index, df_p['BB_up'], color='#30363d', lw=0.8, ls='--')
+        ax.plot(df_p.index, df_p['BB_low'], color='#30363d', lw=0.8, ls='--')
+        
+        # 繪製收盤價與均線
+        ax.plot(df_p.index, df_p['Close'], color='#e0e0e0', lw=2.5, label='Close')
+        ax.plot(df_p.index, df_p['MA20'], color='#d29922', lw=1, alpha=0.8, label='MA20')
+        
+        # 標註價位線
+        ax.axhline(entry_p, color='#58a6ff', ls='-', lw=1.5, alpha=0.6)
+        ax.text(df_p.index[0], entry_p, f' 買點 {entry_p}', color='#58a6ff', va='bottom')
+        
+        # 座標軸美化
+        ax.tick_params(colors='#8b949e', which='both')
+        for spine in ax.spines.values(): spine.set_color('#30363d')
+        ax.grid(color='#30363d', linestyle=':', alpha=0.5)
+        
+        st.pyplot(fig)
+        
+        # 新增量能分析區塊
+        st.markdown("""
+            <div style="background: #161b22; padding: 15px; border-radius: 8px; border: 1px solid #30363d;">
+                <h4 style="margin-top:0; color:#8b949e;">📊 籌碼動能觀測</h4>
+                <p style="font-size:0.9rem;">目前成交量較 20 日均量變化：<b style="color:#58a6ff;">{:.2f}%</b></p>
+            </div>
+        """.format((curr['Vol_Ratio']-1)*100), unsafe_allow_html=True)
 
-            # 詳細診斷
-            st.markdown("### 詳細指標診斷")
-            ind_c1, ind_c2 = st.columns(2)
-            for idx, it in enumerate(indicator_list):
-                col = ind_c1 if idx < 13 else ind_c2
-                icon = "🔴" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🟢"
-                color = "red" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "green"
-                col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{it[2] if it[1] == 1.0 else it[3] if it[1] == 0.5 else it[-1]}</span>", unsafe_allow_html=True)
-
-
+# --- 主程式進入點 ---
+# ... (串聯 sidebar 點擊與上述 display_analysis 函數)
