@@ -52,7 +52,7 @@ def set_mpl_chinese():
 set_mpl_chinese()
 
 def round_stock_price(price):
-    """依照台股升降單位規則修約"""
+    """依照台股升降單位規則修約 (2026 最新規範整合)"""
     if price < 10:
         return np.round(price, 2)
     elif price < 50:
@@ -128,7 +128,7 @@ class StockEngine:
         except: return None
 
 # --- UI 介面 ---
-st.title("🚀 台股決賽分析系統")
+st.title("🚀 台股決策分析系統")
 
 with st.sidebar:
     st.markdown("<h3 class='sidebar-title'>代碼/名稱</h3>", unsafe_allow_html=True)
@@ -164,13 +164,13 @@ if analyze_btn and queries:
             chip_data = engine.fetch_chips(sid)
             curr = df.iloc[-1]
             
-            # --- 關鍵修正：計算買賣點並套用升降單位 ---
+            # 買賣點與修約
             raw_entry = (curr['MA20'] + curr['BB_up']) / 2 if curr['Close'] <= curr['BB_up'] else curr['Close'] * 0.98
             entry_p = round_stock_price(float(raw_entry))
             sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
             tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
 
-            # 指標計算
+            # --- 完整恢復：第一版 25 項指標清單 ---
             indicator_list = [
                 ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
                 ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
@@ -178,24 +178,42 @@ if analyze_btn and queries:
                 ("MACD趨勢", (1.0 if curr['MACD_hist'] > 0 else 0.0), "紅柱", "綠柱"),
                 ("RSI強弱", (1.0 if curr['RSI'] > 50 else 0.0), "強勢", "弱勢"),
                 ("均線排列", (1.0 if curr['MA5'] > curr['MA10'] else 0.0), "多頭", "糾結"),
+                ("威廉指標", (1.0 if curr['K'] > 50 else 0.0), "看多", "看空"),
                 ("乖離率", (1.0 if abs(curr['BIAS20']) < 10 else 0.0), "安全", "過熱"),
+                ("波幅擠壓", (1.0 if curr['BB_width'] < 0.1 else 0.0), "蓄勢", "發散"),
+                ("量價配合", (1.0 if curr['Close'] >= df.iloc[-2]['Close'] else 0.0), "穩健", "背離"),
+                ("能量潮", (1.0 if curr['OBV'] > df['OBV'].mean() else 0.0), "集中", "渙散"),
+                ("資金流向", (1.0 if curr['MFI'] > 50 else 0.0), "流入", "流出"),
+                ("成交均量", (1.0 if curr['Volume'] > curr['VMA20'] else 0.0), "量增", "量縮"),
+                ("多空勁道", (1.0 if curr['Close'] > curr['MA5'] else 0.0), "強勁", "偏弱"),
+                ("乖離動能", (1.0 if curr['BIAS5'] > curr['BIAS20'] else 0.0), "轉強", "趨緩"),
+                ("支撐位階", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "站穩", "破線"),
+                ("多空量比", (1.0 if curr['Vol_Ratio'] > 1 else 0.0), "買盤強", "賣壓大"),
+                ("價格變動", (1.0 if curr['ROC'] > 0 else 0.0), "正向", "負向"),
+                ("歷史位階", (1.0 if curr['SR_Rank'] > 0.5 else 0.0), "健康", "低迷"),
                 ("[籌] 投信連買", (1.0 if chip_data and chip_data['it'] else 0.0), "佈局中", "無動作"),
                 ("[籌] 外資波段", (1.0 if chip_data and chip_data['fg'] else 0.0), "加碼中", "調節中"),
+                ("[籌] 法人集結", (1.0 if chip_data and chip_data['inst'] else 0.0), "共識買", "分散"),
+                ("[籌] 攻擊量能", (1.0 if curr['Volume'] > curr['VMA20'] * 1.3 else 0.0), "爆量", "量縮"),
+                ("[籌] 資金匯集", (1.0 if curr['OBV'] > df['OBV'].tail(5).mean() else 0.0), "匯入", "流出"),
                 ("均線支撐", (1.0 if curr['Close'] > curr['MA10'] else 0.0), "強勁", "跌破")
             ]
-            score = int((sum([it[1] for it in indicator_list]) / len(indicator_list)) * 100)
+            score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
 
             # 得分與評論
             rating = "🚀 強勢標的" if score >= 70 else "⚖️ 穩健標的" if score >= 50 else "⚠️ 觀望標的"
             st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating}")
-            
+            st.write(f"💬 分析評論：{'多空共鳴，適合順勢操作。' if score >= 70 else '格局穩定，建議分批佈局。' if score >= 50 else '訊號疲弱，建議保守觀望。'}")
+
             # --- 數據顯示 (動態精確度) ---
             st.markdown("---")
             c1, c2, c3, c4 = st.columns(4)
 
             def get_metric_html(label, value, val_color):
-                # 根據價格大小決定顯示的小數位數
-                fmt = ".2f" if value < 100 else ".1f" if value < 500 else ".0f"
+                # 依據台股價格區間決定顯示位數
+                if value < 100: fmt = ".2f"
+                elif value < 500: fmt = ".1f"
+                else: fmt = ".0f"
                 return f"""
                 <div style="display:flex; flex-direction:column; align-items:flex-start;">
                     <span style="color:gray; font-size:0.9rem; margin-bottom: 2px;">{label}</span>
@@ -219,9 +237,9 @@ if analyze_btn and queries:
             ax.plot(df_p.index, df_p['BB_up'], color='#e74c3c', ls='--', alpha=0.3)
             ax.plot(df_p.index, df_p['BB_low'], color='#27ae60', ls='--', alpha=0.3)
             ax.plot(df_p.index, df_p['Close'], color='#2c3e50', lw=2)
-            ax.axhline(entry_p, color='#2980b9', ls='-', alpha=0.5, label='Entry')
-            ax.axhline(sl_p, color='green', ls='--', alpha=0.5, label='Stop Loss')
-            ax.axhline(tp_p, color='red', ls='--', alpha=0.5, label='Take Profit')
+            ax.axhline(entry_p, color='#2980b9', ls='-', alpha=0.5)
+            ax.axhline(sl_p, color='green', ls='--', alpha=0.5)
+            ax.axhline(tp_p, color='red', ls='--', alpha=0.5)
             ax.set_title(f"{stock_name} ({sid}) 分析圖")
             st.pyplot(fig)
 
@@ -229,7 +247,7 @@ if analyze_btn and queries:
             st.markdown("### 詳細指標診斷")
             ind_c1, ind_c2 = st.columns(2)
             for idx, it in enumerate(indicator_list):
-                col = ind_c1 if idx < len(indicator_list)/2 else ind_c2
+                col = ind_c1 if idx < 13 else ind_c2
                 icon = "🔴" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🟢"
                 color = "red" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "green"
                 col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{it[2] if it[1] == 1.0 else it[3] if it[1] == 0.5 else it[-1]}</span>", unsafe_allow_html=True)
