@@ -149,9 +149,18 @@ if analyze_btn and queries:
         with tabs[i]:
             sid = engine.special_mapping.get(query, query)
             stock_name = query
-            if not sid.isdigit():
+           if not sid.isdigit():
+                found = False
                 for code, info in twstock.codes.items():
-                    if query in info.name: sid = code; stock_name = info.name; break
+                    # 將 'in' 改為 '==' 實現完全比對
+                    if query == info.name: 
+                        sid = code
+                        stock_name = info.name
+                        found = True
+                        break
+                if not found:
+                    st.error(f"找不到名稱完全符合的股票: {query}")
+                    continue
             elif sid in twstock.codes:
                 stock_name = twstock.codes[sid].name
 
@@ -251,6 +260,7 @@ if analyze_btn and queries:
                 icon = "🔴" if it[1] == 1.0 else "🟠" if it[1] == 0.5 else "🟢"
                 color = "red" if it[1] == 1.0 else "orange" if it[1] == 0.5 else "green"
                 col.markdown(f"{icon} {it[0]}: <span style='color:{color}; font-weight:bold;'>{it[2] if it[1] == 1.0 else it[3] if it[1] == 0.5 else it[-1]}</span>", unsafe_allow_html=True)
+
 
 
 
