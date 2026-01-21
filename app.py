@@ -22,7 +22,7 @@ def load_favorites():
     if os.path.exists(SAVED_FILE):
         with open(SAVED_FILE, "r", encoding="utf-8") as f:
             return [line.strip() for line in f.readlines() if line.strip()]
-    return ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒"]
+    return ["2330", "2317", "2454", "6223", "2603", "2881", "貝爾威勒", "", "", ""]
 
 def save_favorites(queries):
     with open(SAVED_FILE, "w", encoding="utf-8") as f:
@@ -142,7 +142,7 @@ with st.sidebar:
     st.markdown("<h3 class='sidebar-title'>代碼/名稱</h3>", unsafe_allow_html=True)
     analyze_btn = st.button("啟動分析")
     
-    # 讀取自選清單
+    # 讀取並顯示自選清單
     saved_queries = load_favorites()
     queries = []
     for i in range(10):
@@ -154,7 +154,7 @@ with st.sidebar:
 engine = StockEngine()
 
 if analyze_btn and queries:
-    # 儲存本次自選清單
+    # 儲存本次輸入
     save_favorites(queries)
     
     tabs = st.tabs([f" {q} " for q in queries])
@@ -163,21 +163,18 @@ if analyze_btn and queries:
             sid = engine.special_mapping.get(query, query)
             stock_name = query
             
-            # --- 名稱選擇邏輯修正 ---
+            # --- 完全比對邏輯 ---
             if not sid.isdigit():
-                matches = [info for code, info in twstock.codes.items() if query in info.name]
-                if not matches:
-                    st.error(f"找不到名稱符合的股票: {query}")
+                found = False
+                for code, info in twstock.codes.items():
+                    if query == info.name: # 維持 == 完全比對
+                        sid = code
+                        stock_name = info.name
+                        found = True
+                        break
+                if not found:
+                    st.error(f"找不到名稱完全符合的股票: {query}")
                     continue
-                elif len(matches) > 1:
-                    choice = st.selectbox(f"找到多個「{query}」相關結果，請選擇：", 
-                                        options=[f"{m.code} {m.name}" for m in matches],
-                                        key=f"sel_{i}")
-                    sid = choice.split()[0]
-                    stock_name = choice.split()[1]
-                else:
-                    sid = matches[0].code
-                    stock_name = matches[0].name
             elif sid in twstock.codes:
                 stock_name = twstock.codes[sid].name
 
@@ -196,7 +193,7 @@ if analyze_btn and queries:
             sl_p = round_stock_price(entry_p - (float(curr['ATR']) * 2.2))
             tp_p = round_stock_price(entry_p + (entry_p - sl_p) * 2.0)
 
-            # --- 第一版 25 項指標清單 ---
+            # --- 指標清單 (25項) ---
             indicator_list = [
                 ("均線趨勢", (1.0 if curr['Close'] > curr['MA20'] else 0.0), "多頭", "空頭"),
                 ("軌道位階", (1.0 if curr['Close'] > curr['BB_up'] else 0.5 if curr['Close'] > curr['MA20'] else 0.0), "上位", "中位", "下位"),
@@ -226,12 +223,10 @@ if analyze_btn and queries:
             ]
             score = int((sum([it[1] for it in indicator_list]) / 25) * 100)
 
-            # 得分與評論
             rating = "🚀 強勢標的" if score >= 70 else "⚖️ 穩健標的" if score >= 50 else "⚠️ 觀望標的"
             st.markdown(f"### 📊 綜合診斷：{score} 分 | {rating}")
             st.write(f"💬 分析評論：{'多空共鳴，適合順勢操作。' if score >= 70 else '格局穩定，建議分批佈局。' if score >= 50 else '訊號疲弱，建議保守觀望。'}")
 
-            # --- 數據顯示 ---
             st.markdown("---")
             c1, c2, c3, c4 = st.columns(4)
 
@@ -252,7 +247,6 @@ if analyze_btn and queries:
             with c4: st.markdown(get_metric_html("獲利目標", tp_p, "red"), unsafe_allow_html=True)
             st.markdown("---")
 
-            # 圖表
             fig, ax = plt.subplots(figsize=(10, 4.5))
             df_p = df.tail(65)
             ax.plot(df_p.index, df_p['BB_up'], color='#e74c3c', ls='--', alpha=0.3)
@@ -264,7 +258,6 @@ if analyze_btn and queries:
             ax.set_title(f"{stock_name} ({sid}) 分析圖")
             st.pyplot(fig)
 
-            # 詳細診斷
             st.markdown("### 詳細指標診斷")
             ind_c1, ind_c2 = st.columns(2)
             for idx, it in enumerate(indicator_list):
